@@ -1,6 +1,6 @@
 GESTUREASSISTANT — EKSPORT KODU PROJEKTU
-Data eksportu: 2026-11-18 14:06:47
-Liczba plików: 127
+Data eksportu: 2026-11-18 15:00:22
+Liczba plików: 133
 
 ========== LISTA PLIKÓW ==========
 .gitignore
@@ -11,6 +11,8 @@ Liczba plików: 127
 .idea\modules.xml
 .idea\vcs.xml
 .idea\workspace.xml
+aktualizuj_panel_sterowania.py
+aktualizuj_potwierdzanie_gestem.py
 config.json
 docs\ACTIONS.md
 docs\ARCHITECTURE.md
@@ -22,6 +24,7 @@ docs\EXECUTION_FIX_MANIFEST.json
 docs\GESTURE_LIMITATIONS.md
 docs\HANDOFF.md
 docs\IMPLEMENTATION_3B.md
+docs\KALIBRACJA_I_DWIE_DLONIE.md
 docs\PRIVACY.md
 docs\SAFETY.md
 docs\STAGE2_MANIFEST.json
@@ -71,8 +74,10 @@ src\gesture_assistant\gestures\__init__.py
 src\gesture_assistant\gestures\classifier.py
 src\gesture_assistant\gestures\definitions.py
 src\gesture_assistant\gestures\motion_classifier.py
+src\gesture_assistant\gestures\personal.py
 src\gesture_assistant\gestures\quality.py
 src\gesture_assistant\gestures\smoothing.py
+src\gesture_assistant\gestures\two_hands.py
 src\gesture_assistant\integrations\__init__.py
 src\gesture_assistant\integrations\browser_actions.py
 src\gesture_assistant\integrations\contracts.py
@@ -86,6 +91,7 @@ src\gesture_assistant\integrations\windows_actions.py
 src\gesture_assistant\storage\__init__.py
 src\gesture_assistant\storage\placeholders.py
 src\gesture_assistant\ui\__init__.py
+src\gesture_assistant\ui\calibration.py
 src\gesture_assistant\ui\camera_view.py
 src\gesture_assistant\ui\display_names.py
 src\gesture_assistant\ui\main_window.py
@@ -217,7 +223,12 @@ logs/
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a52fb4ea-1b71-4e84-91f8-7bdcc82439de" name="Changes" comment="" />
+    <list default="true" id="a52fb4ea-1b71-4e84-91f8-7bdcc82439de" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/gesture_assistant/ui/main_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/gesture_assistant/ui/main_window.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/gesture_assistant/ui/theme.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/gesture_assistant/ui/theme.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/gesture_assistant/ui/workspace.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/gesture_assistant/ui/workspace.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -261,6 +272,134 @@ logs/
 </project>
 ========== KONIEC PLIKU ==========
 
+========== PLIK: aktualizuj_panel_sterowania.py ==========
+from pathlib import Path
+import ast
+import re
+import shutil
+from datetime import datetime
+
+
+def replace_one(text, old, new):
+    if text.count(old) != 1:
+        raise ValueError(f"Nie znaleziono jednoznacznie fragmentu: {old[:90]}")
+    return text.replace(old, new, 1)
+
+
+def main():
+    root = Path.cwd()
+    ui = root / "src/gesture_assistant/ui"
+    paths = [ui / name for name in ("main_window.py", "workspace.py", "theme.py")]
+    original = [path.read_text(encoding="utf-8-sig") for path in paths]
+    m, w, t = original
+    m = replace_one(m, 'QGroupBox("Co widzi aplikacja")', 'QGroupBox("Stan rozpoznawania")')
+    m = replace_one(m, '        diag_layout.addWidget(self._status_label)', '        self._control_status = QLabel("Kamera nieaktywna")\n        self._control_status.setProperty("role", "status")\n        self._control_status.setWordWrap(True)\n        self._hold_status = QLabel("Przytrzymanie: —")\n        self._hold_status.setProperty("role", "secondary")\n        for item in (self._context_label, self._effective_action_label, self._action_label):\n            item.setTextFormat(Qt.TextFormat.PlainText)\n        diag_layout.addWidget(self._control_status)\n        diag_layout.addWidget(self._status_label)')
+    m = replace_one(m, '        diag_layout.addWidget(self._action_label)',
+                    '        diag_layout.addWidget(self._hold_status)\n'
+                    '        diag_layout.addWidget(self._action_label)')
+    m = replace_one(m, '        safety_vbox.addWidget(self._sleep_check)', '        safety_vbox.addWidget(self._sleep_check)\n        confirmation_hint = QLabel(\n            "Akcje wrażliwe: wybierz, które mogą prosić o jednorazową zgodę. "\n            "Nadal musisz przypisać gest i zezwolić na akcję w profilach."\n        )\n        confirmation_hint.setWordWrap(True)\n        safety_vbox.addWidget(confirmation_hint)\n        self._destructive_checks = {}\n        for action_id, spec in sorted(ACTION_CATALOG.items()):\n            if not spec.destructive or not spec.implemented:\n                continue\n            checkbox = QCheckBox(action_name(action_id, grouped=True))\n            checkbox.setChecked(action_id in self._config["safety"]["confirmed_destructive"])\n            checkbox.setToolTip("Dopuść tylko z osobnym potwierdzeniem przy każdym wykonaniu")\n            safety_vbox.addWidget(checkbox)\n            self._destructive_checks[action_id] = checkbox')
+    anchor = '        new_config["safety"]["sleep_computer"] = self._sleep_check.isChecked()'
+    m = replace_one(m, anchor, anchor + "\n" + '        previous = set(new_config["safety"]["confirmed_destructive"])\n        previous.difference_update(self._destructive_checks)\n        previous.update(key for key, control in self._destructive_checks.items()\n                        if control.isChecked())\n        new_config["safety"]["confirmed_destructive"] = sorted(previous)')
+    anchor = '        self._sleep_check.setChecked(self._config["safety"]["sleep_computer"])'
+    index = m.rindex(anchor) + len(anchor)
+    m = m[:index] + "\n" + '        for key, control in self._destructive_checks.items():\n            control.setChecked(key in self._config["safety"]["confirmed_destructive"])' + m[index:]
+    start = m.index('    def _refresh_actions(')
+    end = m.index('    def _confirm_action(', start)
+    m = m[:start] + '    def _refresh_actions(self) -> None:\n        running = self._worker is not None and self._runtime.is_running\n        paused = self._runtime.safety.paused\n        simulation = self._runtime.executor.dry_run\n        active = running and not paused and not self._demo\n        if self._demo:\n            state, button = "Demo — tylko podgląd", "Sterowanie niedostępne w demo"\n        elif not running:\n            state, button = "Kamera nieaktywna", "Najpierw uruchom kamerę"\n        elif simulation:\n            state = "Symulacja włączona" if active else "Symulacja wyłączona"\n            button = "Wyłącz symulację" if active else "Włącz symulację"\n        else:\n            state = "Sterowanie gestami włączone" if active else "Sterowanie gestami wyłączone"\n            button = "Wyłącz sterowanie gestami" if active else "Włącz sterowanie gestami"\n\n        self._workspace.source.setText(\n            "Źródło: demo na żywo" if self._demo else\n            "Źródło: sesja kamery" if self._worker is not None else "Źródło: kamera nieaktywna"\n        )\n        self._pause_button.setEnabled(running and not self._demo)\n        self._pause_button.setText(button)\n        if self._pause_button.property("controlActive") != active:\n            self._pause_button.setProperty("controlActive", active)\n            self._pause_button.style().unpolish(self._pause_button)\n            self._pause_button.style().polish(self._pause_button)\n        self._live_toggle_button.setEnabled(not self._demo)\n        pending = self._runtime.pending_confirmation() if active else None\n        self._confirm_button.setEnabled(pending is not None)\n        self._confirm_button.setToolTip(\n            f"Oczekuje: {action_name(pending[0])}" if pending else "Brak prośby o potwierdzenie"\n        )\n        outcome = self._runtime.status() if running else None\n        self._control_status.setText(state)\n        self._action_label.setText(\n            "Ostatni wynik: —" if outcome is None else\n            f"Ostatni wynik: {action_name(outcome.action_id)}\\n"\n            f"{format_reason_pl(outcome.reason, outcome.action_id)}"\n        )\n        diag = self._runtime.diagnostics() if running and not self._demo else None\n        if diag is None:\n            self._context_label.setText("Profil: —\\nAktywne okno: —")\n            self._effective_action_label.setText("Przypisana akcja: —")\n            self._hold_status.setText("Przytrzymanie: —")\n        else:\n            profile = PROFILES.get(diag["active_profile"], "Nieustalony")\n            foreground = diag["foreground_exe"]\n            window = Path(foreground).name if foreground else "Nie ustalono"\n            self._context_label.setText(f"Profil: {profile}\\nAktywne okno: {window}")\n            action = diag["effective_action"]\n            reason = diag["reason"]\n            status = format_reason_pl(reason, action or "") if reason else "Oczekiwanie na wynik"\n            if pending:\n                status = f"Oczekuje na potwierdzenie: {action_name(pending[0])}"\n            self._effective_action_label.setText(\n                f"Przypisana akcja: {action_name(action)}\\n{status}"\n            )\n            required = diag.get("required_hold_ms", 700)\n            stable = min(max(0, diag.get("stable_ms", 0)), required)\n            duration = f"{stable / 1000:.2f} / {required / 1000:.2f} s".replace(".", ",")\n            self._hold_status.setText(f"Przytrzymanie: {duration}" if action else "Przytrzymanie: —")\n\n        if self._closing and self._worker is None and not self._runtime.is_running:\n            self.close()\n\n' + m[end:]
+    if m.count('escape(') == 0:
+        m = m.replace('from html import escape\n', '')
+    m = m.replace('"Wznów akcje"', '"Włącz sterowanie gestami"')
+    m = m.replace('"Wstrzymaj akcje"', '"Wyłącz sterowanie gestami"')
+    m = m.replace('„Wznów akcje”', '„Włącz sterowanie gestami”')
+    m = m.replace('„Wstrzymaj akcje”', '„Wyłącz sterowanie gestami”')
+    w = w.replace('"Trening"', '"Podgląd i sterowanie"')
+    selector = '    QPushButton:hover'
+    index = t.index(selector)
+    t = t[:index] + '    QPushButton[controlActive="true"] {{\n        background: {t.ACCENT}; color: {t.BACKGROUND}; border-color: {t.ACCENT};\n    }}\n' + t[index:]
+    for file, code in zip(paths, (m, w, t)):
+        ast.parse(code, filename=str(file))
+    backup = root / ("backup_ui_" + datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+    backup.mkdir()
+    for file in paths:
+        shutil.copy2(file, backup / file.name)
+    for file, code in zip(paths, (m, w, t)):
+        file.write_text(code, encoding="utf-8")
+    print(f"Zastosowano aktualizację. Kopia: {backup}")
+
+
+if __name__ == "__main__":
+    main()
+
+========== KONIEC PLIKU ==========
+
+========== PLIK: aktualizuj_potwierdzanie_gestem.py ==========
+import ast
+import re
+import shutil
+from datetime import datetime
+from pathlib import Path
+
+
+def once(text, old, new):
+    if text.count(old) != 1:
+        raise ValueError(f"Nieobsługiwana wersja pliku: {old[:70]}")
+    return text.replace(old, new, 1)
+
+
+def main():
+    root = Path(__file__).resolve().parent
+    if root.name.casefold() != "gestureassistantv4" or not (root / "main.py").is_file():
+        raise SystemExit("Umieść skrypt obok main.py w katalogu GestureAssistantv4.")
+    src = root / "src/gesture_assistant"
+    paths = [src / p for p in ("core/safety_manager.py", "core/action_runtime.py", "ui/main_window.py")]
+    safety, runtime, ui = [p.read_text(encoding="utf-8-sig") for p in paths]
+    anchor = "    def request(self, action_id, signal, context):"
+    safety = once(safety, anchor, '    def request_gesture_confirmation(self, action_id, context, opened_at, deadline):\n        with self._lock:\n            now = self.clock()\n            signal = Gesture.DOUBLE_THUMBS_UP.value\n            if (now >= deadline or self._since is None or self._since < opened_at\n                    or self._last is None or self._last - self._since < 2000\n                    or self._gesture.value != signal):\n                return None\n            request = self.request(action_id, signal, context)\n            if request is not None:\n                self._confirmations[action_id] = (context.identity, deadline)\n            return request\n\n' + anchor)
+    anchor = '            if action.destructive:\n'
+    safety = once(safety, anchor, anchor + '                if request.signal == Gesture.DOUBLE_THUMBS_UP.value and (\n                    self._since is None or self._last - self._since < 2000\n                ):\n                    return "gesture_not_stable_700ms"\n')
+    anchor = '        if action is None:\n            return\n        with self._lock:\n            if self._confirmation is not None and self._confirmation[0] == action:\n                return\n'
+    runtime = once(runtime, anchor, '        with self._lock:\n            pending = self._confirmation\n            confirmation_signal = signal == "DOUBLE_THUMBS_UP"\n            if pending is not None:\n                action_id, target, deadline = pending\n                now = self.safety.clock()\n                if now >= deadline or context.identity != target.identity:\n                    self._confirmation = None\n                    return\n                if observed and confirmation_signal:\n                    request = self.safety.request_gesture_confirmation(\n                        action_id, context, deadline - 15000, deadline,\n                    )\n                    if request is not None:\n                        if self.queue.put(request):\n                            self._confirmation = None\n                        else:\n                            self.safety.discard(request)\n                return\n            if confirmation_signal:\n                return  # Reserved for confirmations; never dispatch a normal binding.\n' + '        if action is None:\n            return\n')
+    runtime = once(runtime, '        with self._lock:\n            self._confirmation = (action_id, context, self.safety.clock() + 15000)',
+                   '        with self._lock:\n            if not self._stop.is_set() and not self.safety.paused and self._confirmation is None:\n                self._confirmation = (action_id, context, self.safety.clock() + 15000)')
+    start = ui.index('    def _confirm_action(')
+    end = ui.index('    def ', start + 8)
+    ui = ui[:start] + ui[end:]
+    ui = ui.replace(', self._confirm_button):', '):')
+    tree = ast.parse(ui)
+    lines = ui.splitlines(keepends=True)
+    remove = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.Expr)) and any(
+            isinstance(item, ast.Attribute) and item.attr == '_confirm_button'
+            for item in ast.walk(node)
+        ):
+            remove.update(range(node.lineno, node.end_lineno + 1))
+    ui = ''.join(line for number, line in enumerate(lines, 1) if number not in remove)
+    # Remove a now-empty legacy tooltip branch, if present.
+    ui = ui.replace('        if outcome is not None:\n\n        # Aktualizacja',
+                    '\n        # Aktualizacja')
+    ui, count = re.subn(r'(?m)^(        pending = self\._runtime\.pending_confirmation\(\)[^\n]*\n)',
+                       lambda m: m[0] + '        notice_key = pending if pending else None\n        if notice_key != getattr(self, "_last_confirmation_notice", None):\n            self._last_confirmation_notice = notice_key\n            if pending:\n                title = f"Potwierdź: {action_name(pending[0])}"\n                text = "Zostań w tym samym oknie. Przytrzymaj oba kciuki w górę przez 2 sekundy."\n                self.statusBar().showMessage(f"{title} — {text}", 15000)\n                tray = self._workspace.tray\n                if tray is not None and tray.isVisible() and tray.supportsMessages():\n                    tray.showMessage(title, text)\n            else:\n                self.statusBar().clearMessage()\n', ui)
+    if count != 1 or '_confirm_button' in ui:
+        raise ValueError("Nieobsługiwany wariant panelu potwierdzania.")
+    ui = ui.replace('Wymagane jednorazowe potwierdzenie w GUI',
+                    'Potwierdź: przytrzymaj oba kciuki w górę przez 2 sekundy')
+    for path, code in zip(paths, (safety, runtime, ui)):
+        ast.parse(code, filename=str(path))
+    backup = root / ("backup_potwierdzanie_" + datetime.now().strftime("%Y%m%d_%H%M%S_%f"))
+    backup.mkdir()
+    for path in paths:
+        shutil.copy2(path, backup / path.name)
+    for path, code in zip(paths, (safety, runtime, ui)):
+        path.write_text(code, encoding="utf-8")
+    print(f"Zastosowano. Kopia: {backup}")
+
+
+if __name__ == "__main__":
+    main()
+
+========== KONIEC PLIKU ==========
+
 ========== PLIK: config.json ==========
 {
   "schema_version": 1,
@@ -292,15 +431,15 @@ logs/
     "paused": true,
     "enabled": true,
     "sleep_computer": true,
-    "confirmed_destructive": []
+    "confirmed_destructive": [
+      "system.close_active_window"
+    ]
   },
   "allowed_actions": [
-    "browser.open_url",
-    "media.volume_up"
+    "system.close_active_window"
   ],
   "bindings": {
-    "VICTORY": "media.volume_up",
-    "OPEN_PALM": "browser.open_url"
+    "OPEN_PALM": "system.close_active_window"
   },
   "targets": {
     "applications": {},
@@ -313,7 +452,9 @@ logs/
       "browser.go_back": "alt+left",
       "browser.previous_tab": "ctrl+shift+tab",
       "browser.next_tab": "ctrl+tab",
-      "media.volume_up": "volume_up"
+      "media.volume_up": "volume_up",
+      "media.next_track": "media_next_track",
+      "presentation.next_slide": "right"
     }
   },
   "execution": {
@@ -1269,6 +1410,33 @@ Założenia o skrótach zweryfikowano w dokumentacji Microsoft; źródła w ACTI
 GetActiveWindow z pygetwindow uzupełnia natywny odczyt PID/exe, nie zastępuje go tytułem okna.
 Nie deklarujemy skuteczności reakcji like/applause bez indywidualnej konfiguracji.
 Nie obiecujemy braku wyścigu fokusu ani anulowania rozpoczętego systemowego wywołania.
+
+========== KONIEC PLIKU ==========
+
+========== PLIK: docs\KALIBRACJA_I_DWIE_DLONIE.md ==========
+# Dwie dłonie i kalibracja
+
+Baza: eksport 2026-11-18 14:06:47. Motyw i config.json pozostają bez zmian.
+
+- Dwie dłonie: najpierw sprawdzany jest gest pary. Jeżeli go nie ma, preferowany jest
+  pojedynczy rozpoznany gest dopuszczony w bieżącym profilu z uwzględnieniem mapowania
+  globalnego. Gdy obydwie dłonie nadają się do akcji, wybór jest odrzucany. Słaba lub
+  nierozpoznana druga dłoń nie blokuje prawidłowej pierwszej. Jeżeli nie ma jednoznacznego
+  rozróżnienia lewej i prawej dłoni, system odmawia wyboru w tej klatce.
+- Trójkąt, dwie pięści i dwa kciuki w górę: ustaw przypisanie ręcznie. Niezmapowany gest
+  pary ma pierwszeństwo, ale nie wykona żadnej akcji. Geometria pary jest heurystyką.
+- Kalibracja: rozpocznij podgląd na karcie Kalibracja gestów, wybierz gest i zapisuj próbki
+  ręcznie. Między próbkami usuń dłoń z kadru. Potrzeba 10 próbek w co najmniej 3 obszarach.
+  Zapisane są znormalizowane cechy 2D, nie klatki kamery. Zapis jest lokalny dla użytkownika
+  (Qt QSettings), według numeru kamery i orientacji; nie jest synchronizowany.
+- Przy włączonej kalibracji klasyfikator osobisty tylko uzupełnia nieznany wynik, bez
+  nadpisywania rozpoznanych gestów. Wspiera gesty statyczne jednej dłoni, nie ruchy i pary.
+  Próbki nie modyfikują MediaPipe. Sesja zbierania nie uruchamia wykonawcy. Wynik
+  kalibrowany nie wywołuje akcji oznaczonej jako destrukcyjna. Próg pewności nadal obowiązuje.
+- Odbicie i obrót 180° działają przed inferencją i podglądem; kierunki ruchu są zgodne
+  z przekształconym obrazem. Włączniki obowiązują od następnej sesji kamery.
+- Brak potwierdzenia na kamerze i GUI Windows. Geometria gestów oraz progi dopasowania
+  wymagają sprawdzenia na docelowym urządzeniu, najlepiej najpierw w symulacji.
 
 ========== KONIEC PLIKU ==========
 
@@ -3183,6 +3351,7 @@ from src.gesture_assistant.core.action_queue import ActionQueue
 from src.gesture_assistant.core.config_manager import defaults
 from src.gesture_assistant.core.context_detector import ContextDetector, clock_ms
 from src.gesture_assistant.core.safety_manager import SafetyManager
+from src.gesture_assistant.integrations import ACTION_CATALOG
 from src.gesture_assistant.integrations.dispatcher import NativeDispatcher
 
 logger = logging.getLogger(__name__)
@@ -3219,6 +3388,14 @@ class ActionRuntime:
             self.executor.dry_run = self._config["execution"]["dry_run"]
             self.executor.dispatcher = NativeDispatcher(self._config)
 
+    def active_gesture_signals(self):
+        config = self.safety.config
+        context = self.detector.detect(config["mode"])
+        bindings = dict(config["profiles"].get(context.profile.value, {}))
+        bindings.update(config["bindings"])
+        return {signal for signal, action in bindings.items()
+                if action in config["allowed_actions"]}
+
     def observe(self, analysis):
         observed = self.safety.observe(analysis)
         if not observed:
@@ -3237,6 +3414,10 @@ class ActionRuntime:
             action_source = (
                 f"Profil: {context.profile.value}" if action is not None else "Brak przypisania"
             )
+
+        if getattr(analysis, "calibrated", False) and action and ACTION_CATALOG[action].destructive:
+            action = None
+            action_source = "Kalibracja nie uruchamia akcji wymagających potwierdzenia"
 
         with self._lock:
             self._latest_diagnostics = {
@@ -3280,11 +3461,29 @@ class ActionRuntime:
 
         if not observed or self.safety.paused or not config["safety"]["enabled"]:
             return
+        with self._lock:
+            pending = self._confirmation
+            confirmation_signal = signal == "DOUBLE_THUMBS_UP"
+            if pending is not None:
+                action_id, target, deadline = pending
+                now = self.safety.clock()
+                if now >= deadline or context.identity != target.identity:
+                    self._confirmation = None
+                    return
+                if observed and confirmation_signal:
+                    request = self.safety.request_gesture_confirmation(
+                        action_id, context, deadline - 15000, deadline,
+                    )
+                    if request is not None:
+                        if self.queue.put(request):
+                            self._confirmation = None
+                        else:
+                            self.safety.discard(request)
+                return
+            if confirmation_signal:
+                return  # Reserved for confirmations; never dispatch a normal binding.
         if action is None:
             return
-        with self._lock:
-            if self._confirmation is not None and self._confirmation[0] == action:
-                return
         request = self.safety.request(action, signal, context)
         if request is not None and not self.queue.put(request):
             self.safety.discard(request)
@@ -3328,7 +3527,8 @@ class ActionRuntime:
 
     def _need_confirmation(self, action_id, context):
         with self._lock:
-            self._confirmation = (action_id, context, self.safety.clock() + 15000)
+            if not self._stop.is_set() and not self.safety.paused and self._confirmation is None:
+                self._confirmation = (action_id, context, self.safety.clock() + 15000)
 
     def pending_confirmation(self):
         with self._lock:
@@ -3399,6 +3599,8 @@ from src.gesture_assistant.gestures.definitions import (
     MotionConfig,
     Quality,
 )
+from src.gesture_assistant.gestures.personal import match
+from src.gesture_assistant.gestures.two_hands import classify_pair
 from src.gesture_assistant.gestures.quality import inspect_hand
 from src.gesture_assistant.gestures.smoothing import LandmarkSmoother
 
@@ -3415,10 +3617,11 @@ class AnalysisResult:
     gesture_event: Gesture | None
     motion_event: Motion | None
     tracking_epoch: int = 0
+    calibrated: bool = False
 
 
 class AnalysisPipeline:
-    """One unambiguous hand; fails closed for multiple hands or unreliable data."""
+    """Select one unambiguous command without carrying hold between hands."""
 
     def __init__(self, config: GestureConfig | None = None):
         self.config = config or GestureConfig()
@@ -3432,6 +3635,10 @@ class AnalysisPipeline:
         self._side = None
         self._wrist = None
         self._tracking_epoch = 0
+        self._pair_wrists = {}
+        self._was_calibrated = False
+        self.samples = {}
+        self.active_signals = lambda: set()
 
     def process(self, result, width, height):
         now = result.timestamp_ms
@@ -3443,9 +3650,33 @@ class AnalysisPipeline:
         self._last = now
         hand = result.hands[0] if len(result.hands) == 1 else None
         quality, _, _ = inspect_hand(hand, width, height, self.config)
+        pair = Gesture.UNKNOWN
         if len(result.hands) > 1:
+            candidates = [item for item in result.hands
+                          if inspect_hand(item, width, height, self.config)[0] == Quality.VALID]
             quality = Quality.MULTIPLE_HANDS
-        switch = hand is not None and self._side not in (None, hand.handedness)
+            if len(result.hands) == 2 and len(candidates) == 2 and (
+                candidates[0].handedness != candidates[1].handedness
+            ):
+                labels = tuple(self.gestures.classifier.classify(item, width, height).gesture
+                               for item in candidates)
+                pair = classify_pair(*candidates, labels, width, height)
+                if pair == Gesture.UNKNOWN:
+                    signals = self.active_signals()
+                    selected = [item for item, gesture in zip(candidates, labels)
+                                if gesture.value in signals]
+                    if not selected:
+                        selected = [item for item, gesture in zip(candidates, labels)
+                                    if gesture != Gesture.UNKNOWN]
+                    if len(selected) == 1:
+                        hand, quality = selected[0], Quality.VALID
+            elif len(result.hands) == 2 and len(candidates) == 1:
+                hand, quality = candidates[0], Quality.VALID
+        calibrated = False
+        if pair != Gesture.UNKNOWN:
+            quality = Quality.VALID
+        side = "pair" if pair != Gesture.UNKNOWN else hand.handedness if hand else None
+        switch = side is not None and self._side not in (None, side)
         if hand is not None and self._wrist is not None:
             wrist = hand.landmarks[0] if hand.landmarks else None
             if wrist is not None:
@@ -3454,6 +3685,16 @@ class AnalysisPipeline:
                     or ((wrist.x - self._wrist.x) ** 2 + (wrist.y - self._wrist.y) ** 2) ** 0.5
                     > self.motions.classifier.config.max_step
                 )
+        pair_wrists = ({item.handedness: item.landmarks[0] for item in candidates}
+                       if pair != Gesture.UNKNOWN else {})
+        for name, wrist in pair_wrists.items():
+            previous = self._pair_wrists.get(name)
+            if previous is not None and ((wrist.x - previous.x) ** 2 +
+                                         (wrist.y - previous.y) ** 2) ** 0.5 > (
+                self.motions.classifier.config.max_step
+            ):
+                switch = True
+        self._pair_wrists = pair_wrists
         if gap or switch:
             self.gestures.debouncer.tracking_discontinuity()
         if gap or switch or quality != Quality.VALID:
@@ -3461,7 +3702,11 @@ class AnalysisPipeline:
             self.smoother.reset()
             self.motions.classifier.reset()
             self.gestures.debouncer.reset_candidate()
-        if quality == Quality.VALID:
+        if pair != Gesture.UNKNOWN:
+            self._side, self._wrist = side, None
+            gesture, confidence, motion = pair, 0.80, Motion.NONE
+            self.motions.update(None, Gesture.NONE, now)
+        elif quality == Quality.VALID:
             self._side = hand.handedness
             self._wrist = hand.landmarks[0]
             smoothed = self.smoother.update(hand, now)
@@ -3503,15 +3748,23 @@ class AnalysisPipeline:
                 if gesture == classification.gesture
                 else raw.confidence
             )
+            if gesture == Gesture.UNKNOWN and raw.gesture == classification.gesture and self.samples:
+                gesture = match(hand, width, height, self.samples)
+                calibrated = gesture != Gesture.UNKNOWN
+                confidence = 0.76 if calibrated else 0.0
         else:
             self._side, self._wrist = None, None
             gesture, motion, confidence = Gesture.NONE, Motion.NONE, 0.0
             self.motions.update(None, Gesture.NONE, now)
+        if calibrated != self._was_calibrated:
+            self._tracking_epoch += 1
+            self.gestures.debouncer.tracking_discontinuity()
+        self._was_calibrated = calibrated
         cooldown = self.motions.classifier.cooldowns.remaining("motion", now)
         event = self.gestures.debouncer.update(gesture, now, allow_emit=cooldown == 0)
         static_cd = self.gestures.debouncer.cooldowns.remaining(gesture, now)
         feedback = (
-            "Pokaż jedną dłoń"
+            "Dwie dłonie: brak jednej jednoznacznej komendy"
             if quality == Quality.MULTIPLE_HANDS
             else "Niewiarygodne dane lub brak dłoni"
             if quality != Quality.VALID
@@ -3534,6 +3787,7 @@ class AnalysisPipeline:
             event,
             motion if motion != Motion.NONE else None,
             self._tracking_epoch,
+            calibrated,
         )
 
     def apply_config(self, config: dict):
@@ -4167,6 +4421,19 @@ class SafetyManager:
             self._config = validate_config(config)
             self._invalidate()
 
+    def request_gesture_confirmation(self, action_id, context, opened_at, deadline):
+        with self._lock:
+            now = self.clock()
+            signal = Gesture.DOUBLE_THUMBS_UP.value
+            if (now >= deadline or self._since is None or self._since < opened_at
+                    or self._last is None or self._last - self._since < 2000
+                    or self._gesture.value != signal):
+                return None
+            request = self.request(action_id, signal, context)
+            if request is not None:
+                self._confirmations[action_id] = (context.identity, deadline)
+            return request
+
     def request(self, action_id, signal, context):
         with self._lock:
             now = self.clock()
@@ -4277,6 +4544,10 @@ class SafetyManager:
                 return "gesture_changed"
             action = ACTION_CATALOG[request.action_id]
             if action.destructive:
+                if request.signal == Gesture.DOUBLE_THUMBS_UP.value and (
+                    self._since is None or self._last - self._since < 2000
+                ):
+                    return "gesture_not_stable_700ms"
                 if request.action_id not in self._config["safety"]["confirmed_destructive"]:
                     return "destructive_not_enabled_in_settings"
                 confirmation = self._confirmations.pop(request.action_id, None)
@@ -4507,6 +4778,9 @@ class Gesture(str, Enum):
     POINTING_UP = "POINTING_UP"
     PINCH = "PINCH"
     ROCK = "ROCK"
+    TRIANGLE = "TRIANGLE"
+    DOUBLE_FIST = "DOUBLE_FIST"
+    DOUBLE_THUMBS_UP = "DOUBLE_THUMBS_UP"
 
 
 class Motion(str, Enum):
@@ -4660,6 +4934,58 @@ class MotionClassifier:
 
 ========== KONIEC PLIKU ==========
 
+========== PLIK: src\gesture_assistant\gestures\personal.py ==========
+import math
+
+from src.gesture_assistant.gestures.definitions import Gesture
+
+SINGLE = tuple(g for g in Gesture if g.value in {
+    "OPEN_PALM", "FIST", "THUMBS_UP", "THUMBS_DOWN", "VICTORY", "POINTING_UP", "PINCH", "ROCK",
+})
+
+
+def features(hand, width, height):
+    if len(hand.landmarks) != 21:
+        return None
+    root = hand.landmarks[0]
+    middle = hand.landmarks[9]
+    scale = math.hypot((middle.x - root.x) * width, (middle.y - root.y) * height)
+    if not math.isfinite(scale) or scale < 1:
+        return None
+    direction = -1 if hand.handedness == "Left" else 1
+    values = tuple(value for point in hand.landmarks for value in (
+        direction * (point.x - root.x) * width / scale,
+        (point.y - root.y) * height / scale,
+    ))
+    return values if valid(values) else None
+
+
+def valid(values):
+    return isinstance(values, (tuple, list)) and len(values) == 42 and all(
+        type(v) in (int, float) and math.isfinite(v) and abs(v) <= 10 for v in values
+    )
+
+
+def match(hand, width, height, samples):
+    vector = features(hand, width, height)
+    if vector is None:
+        return Gesture.UNKNOWN
+    ranked = []
+    for gesture in SINGLE:
+        rows = samples.get(gesture.value, ())
+        if len(rows) != 10 or not all(valid(row) for row in rows):
+            continue
+        distances = sorted(math.dist(vector, row) / math.sqrt(42) for row in rows)
+        ranked.append((sum(distances[:3]) / 3, gesture))
+    ranked.sort(key=lambda item: item[0])
+    if not ranked or ranked[0][0] > 0.14:
+        return Gesture.UNKNOWN
+    if len(ranked) > 1 and ranked[1][0] - ranked[0][0] < 0.06:
+        return Gesture.UNKNOWN
+    return ranked[0][1]
+
+========== KONIEC PLIKU ==========
+
 ========== PLIK: src\gesture_assistant\gestures\quality.py ==========
 import numpy as np
 
@@ -4763,6 +5089,33 @@ class LandmarkSmoother:
         self._last = timestamp_ms
         self._side = hand.handedness
         return replace(hand, landmarks=tuple(HandPoint(*p) for p in self._points))
+
+========== KONIEC PLIKU ==========
+
+========== PLIK: src\gesture_assistant\gestures\two_hands.py ==========
+from math import hypot
+
+from src.gesture_assistant.gestures.definitions import Gesture
+
+
+def classify_pair(first, second, labels, width, height):
+    def distance(a, b):
+        return hypot((a.x - b.x) * width, (a.y - b.y) * height)
+
+    a, b = first.landmarks, second.landmarks
+    scale = (distance(a[0], a[9]) + distance(b[0], b[9])) / 2
+    if scale <= 0 or distance(a[0], b[0]) < 0.75 * scale:
+        return Gesture.UNKNOWN
+    if labels == (Gesture.FIST, Gesture.FIST) and distance(a[0], b[0]) < 4 * scale:
+        return Gesture.DOUBLE_FIST
+    if labels == (Gesture.THUMBS_UP, Gesture.THUMBS_UP):
+        return Gesture.DOUBLE_THUMBS_UP
+    if (distance(a[8], b[8]) < 0.24 * scale
+            and distance(a[4], b[4]) < 0.24 * scale
+            and a[4].y + b[4].y - a[8].y - b[8].y > 0.8 * scale / height
+            and min(distance(a[4], a[8]), distance(b[4], b[8])) > 0.55 * scale):
+        return Gesture.TRIANGLE
+    return Gesture.UNKNOWN
 
 ========== KONIEC PLIKU ==========
 
@@ -5515,6 +5868,164 @@ DATABASE_FILE_EXTENSIONS: tuple[str, ...] = (".db", ".sqlite")
 
 ========== KONIEC PLIKU ==========
 
+========== PLIK: src\gesture_assistant\ui\calibration.py ==========
+import json
+import time
+
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QCheckBox, QComboBox, QLabel, QPushButton, QVBoxLayout, QWidget
+
+from src.gesture_assistant.gestures.definitions import GestureConfig, Quality
+from src.gesture_assistant.gestures.personal import SINGLE, features, valid
+from src.gesture_assistant.gestures.quality import inspect_hand
+from src.gesture_assistant.ui.camera_view import CameraView
+from src.gesture_assistant.ui.display_names import GESTURES
+
+
+class CalibrationPage(QWidget):
+    def __init__(self, window):
+        super().__init__(window)
+        self.window = window
+        self.settings = QSettings("GestureAssistant", "GestureAssistant")
+        self.pending = []
+        self.last = None
+        self.capture_session = False
+        layout = QVBoxLayout(self)
+        title = QLabel("Kalibracja gestów")
+        title.setProperty("role", "title")
+        layout.addWidget(title)
+        self.enabled = self.option(layout, "Używaj mojej kalibracji", "enabled")
+        self.mirror = self.option(layout, "Odbicie lustrzane", "mirror")
+        self.rotate = self.option(layout, "Obrót kamery o 180°", "rotate")
+        self.mirror.hide()
+        self.rotate.hide()
+        hint = QLabel("Ustawienia obowiązują od następnej sesji kamery. Wybierz gest i zapisz "
+                      "10 osobnych próbek. Rozłóż je na co najmniej 3 obszary obrazu. "
+                      "Między próbkami opuść dłoń. Kalibracja nie wykonuje akcji.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        self.gesture = QComboBox()
+        for gesture in SINGLE:
+            self.gesture.addItem(GESTURES[gesture.value][0], gesture.value)
+        self.gesture.currentIndexChanged.connect(self.reset_pending)
+        layout.addWidget(self.gesture)
+        self.preview = CameraView()
+        layout.addWidget(self.preview, 1)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
+        for text, callback in (("Uruchom kamerę do kalibracji", self.start),
+                               ("Zapisz pokazaną próbkę", self.capture),
+                               ("Zakończ podgląd kalibracji", self.stop)):
+            button = QPushButton(text)
+            button.clicked.connect(callback)
+            layout.addWidget(button)
+        self.reset_pending()
+
+    def option(self, layout, text, key):
+        control = QCheckBox(text)
+        control.setChecked(self.settings.value(key, False, type=bool))
+        control.toggled.connect(lambda checked: self.settings.setValue(key, checked))
+        layout.addWidget(control)
+        return control
+
+    def orientation(self):
+        return self.mirror.isChecked(), self.rotate.isChecked()
+
+    def key(self, source, orientation):
+        return f"samples/{source}-{int(orientation[0])}-{int(orientation[1])}"
+
+    def load(self, source, orientation):
+        try:
+            data = json.loads(self.settings.value(self.key(source, orientation), "{}", type=str))
+        except (ValueError, TypeError):
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return {g.value: rows for g in SINGLE if isinstance(rows := data.get(g.value), list)
+                and len(rows) == 10 and all(valid(row) for row in rows)}
+
+    def reset_pending(self):
+        self.pending.clear()
+        self.status.setText(GESTURES[self.gesture.currentData()][1] + " · 0/10 próbek")
+
+    def start(self):
+        if self.window._worker is not None or self.window._runtime.is_running:
+            self.status.setText("Najpierw zakończ bieżącą sesję w Treningu.")
+            return
+        self.reset_pending()
+        self.source = self.window._camera_index.value()
+        self.session_orientation = self.orientation()
+        self.capture_session = True
+        self.released = True
+        self.last = None
+        self.window._demo = True
+        self.window._start_analysis()
+        if self.window._worker is None:
+            self.capture_session = self.window._demo = False
+            self.status.setText(self.window._error_label.text() or "Nie uruchomiono kamery.")
+
+    def stop(self):
+        if self.capture_session:
+            self.window._stop_analysis()
+
+    def finished(self):
+        if self.capture_session:
+            self.capture_session = False
+            self.preview.clear()
+            self.last = None
+            if self.window._failed:
+                self.status.setText(self.window._error_label.text())
+
+    def observe(self, frame, result):
+        if not self.capture_session:
+            return
+        height, width = frame.shape[:2]
+        hands = tuple(hand for hand in result.hands if len(hand.landmarks) == 21)
+        if self.isVisible():
+            self.preview.set_frame(frame, hands)
+        if not result.hands:
+            self.released = True
+        self.last = (time.monotonic(), result.hands, width, height)
+
+    def capture(self):
+        if not self.capture_session or self.last is None:
+            self.status.setText("Najpierw uruchom podgląd kalibracji.")
+            return
+        if not self.released:
+            self.status.setText(f"Opuść dłoń przed następną próbką · {len(self.pending)}/10")
+            return
+        seen, hands, width, height = self.last
+        if (time.monotonic() - seen > 0.25 or len(hands) != 1
+                or inspect_hand(hands[0], width, height, GestureConfig())[0] != Quality.VALID):
+            self.status.setText("Pokaż jedną całą dłoń i spróbuj ponownie.")
+            return
+        vector = features(hands[0], width, height)
+        if vector is None:
+            self.status.setText("Nie można zapisać tej próbki.")
+            return
+        wrist = hands[0].landmarks[0]
+        area = (int(wrist.x * 3), int(wrist.y * 3))
+        if len(self.pending) == 9 and len({zone for _, zone in self.pending} | {area}) < 3:
+            self.status.setText("9/10 — ostatnią próbkę pokaż w innym obszarze obrazu.")
+            return
+        self.pending.append((vector, area))
+        self.released = False
+        if len(self.pending) == 10:
+            samples = self.load(self.source, self.session_orientation)
+            samples[self.gesture.currentData()] = [values for values, _ in self.pending]
+            self.settings.setValue(self.key(self.source, self.session_orientation), json.dumps(samples))
+            self.settings.sync()
+            self.pending.clear()
+            if self.settings.status() == QSettings.Status.NoError:
+                self.status.setText("Zapisano 10 próbek. Włącz kalibrację i rozpocznij nową sesję.")
+            else:
+                self.status.setText("Nie udało się zapisać próbek w ustawieniach systemu.")
+        else:
+            self.status.setText(f"{len(self.pending)}/10 · opuść dłoń i zmień położenie w kadrze")
+
+========== KONIEC PLIKU ==========
+
 ========== PLIK: src\gesture_assistant\ui\camera_view.py ==========
 import math
 
@@ -5684,6 +6195,9 @@ GROUPS = {
 }
 
 GESTURES = {
+    "TRIANGLE": ("Trójkąt", "Połącz opuszki palców wskazujących u góry, kciuków na dole."),
+    "DOUBLE_FIST": ("Dwie pięści", "Zaciśnij obie pięści i pokaż je obok siebie."),
+    "DOUBLE_THUMBS_UP": ("Dwa kciuki w górę", "Pokaż jednocześnie oba kciuki skierowane w górę."),
     "OPEN_PALM": ("Otwarta dłoń", "Rozprostuj palce i skieruj dłoń do kamery."),
     "FIST": ("Pięść", "Zegnij wszystkie palce, formując pięść."),
     "VICTORY": ("Znak V", "Wyprostuj palec wskazujący i środkowy, pozostałe zegnij."),
@@ -5723,7 +6237,6 @@ def gesture_name(identifier):
 import math
 import time
 from copy import deepcopy
-from html import escape
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
@@ -5782,6 +6295,9 @@ SIGNALS_CATALOG = (
     ("POINTING_UP", "Wskazanie w górę (POINTING_UP)"),
     ("PINCH", "Złączenie palców (PINCH)"),
     ("ROCK", "Gest rock (ROCK)"),
+    ("TRIANGLE", "Trójkąt"),
+    ("DOUBLE_FIST", "Dwie pięści"),
+    ("DOUBLE_THUMBS_UP", "Dwa kciuki w górę"),
     ("SWIPE_LEFT", "Ruch w lewo (SWIPE_LEFT)"),
     ("SWIPE_RIGHT", "Ruch w prawo (SWIPE_RIGHT)"),
     ("SWIPE_UP", "Ruch w górę (SWIPE_UP)"),
@@ -5789,7 +6305,7 @@ SIGNALS_CATALOG = (
 )
 
 QUALITY_NAMES = {
-    "VALID": "Dobra", "NO_HAND": "Brak dłoni", "MULTIPLE_HANDS": "Więcej niż jedna dłoń",
+    "VALID": "Dobra", "NO_HAND": "Brak dłoni", "MULTIPLE_HANDS": "Brak jednoznacznego gestu dwóch dłoni",
     "LOW_CONFIDENCE": "Niska pewność", "OUT_OF_FRAME": "Dłoń poza kadrem",
     "INVALID": "Nieczytelny obraz dłoni",
 }
@@ -5824,7 +6340,7 @@ REASON_TRANSLATIONS = {
     "gesture_changed": "Zmieniono gest przed wykonaniem",
     "gesture_latched": "Gest już wykonany — zwolnij dłoń przed ponowieniem",
     "expired_request": "Zdarzenie wygasło w kolejce",
-    "explicit_confirmation_required": "Wymagane jednorazowe potwierdzenie w GUI",
+    "explicit_confirmation_required": "Potwierdź: przytrzymaj oba kciuki w górę przez 2 sekundy",
     "destructive_not_enabled_in_settings": "Akcja destrukcyjna nie jest aktywowana w ustawieniach",
     "authorization_changed": "Autoryzacja wygasła (zmiana aktywnego okna lub utrata dłoni)",
     "dry_run_no_side_effect": "Symulacja — rozpoznano gest, ale niczego nie wykonano",
@@ -5835,6 +6351,10 @@ REASON_TRANSLATIONS = {
 
 
 def format_reason_pl(reason: str, action_id: str = "") -> str:
+    if action_id == "system.close_active_window" and (
+        reason == "executed" or reason.startswith("executed:")
+    ):
+        return "Wysłano Alt+F4 — nie sprawdzono, czy okno się zamknęło"
     if action_id == "browser.open_url" and reason.startswith("executed"):
         return "Przekazano URL do przeglądarki domyślnej (bez potwierdzenia załadowania)"
     if not reason:
@@ -5887,7 +6407,7 @@ class MainWindow(QMainWindow):
         self._start_button = QPushButton("Start")
         self._stop_button = QPushButton("Zakończ sesję")
         self._stop_button.setEnabled(False)
-        self._pause_button = QPushButton("Wznów akcje")
+        self._pause_button = QPushButton("Włącz sterowanie gestami")
         self._pause_button.clicked.connect(self._toggle_actions_pause)
 
         is_dry = self._config["execution"]["dry_run"]
@@ -5913,7 +6433,7 @@ class MainWindow(QMainWindow):
         self._error_label = QLabel(self._config_message)
         self._error_label.setWordWrap(True)
         self._error_label.setStyleSheet("color: #ff6b6b;")
-        self._action_label = QLabel("Wznów akcje")
+        self._action_label = QLabel("Włącz sterowanie gestami")
         self._action_label.setWordWrap(True)
 
         self._context_label = QLabel("Profil: — | Aktywna aplikacja: —")
@@ -5921,9 +6441,6 @@ class MainWindow(QMainWindow):
         self._effective_action_label = QLabel("Efektywna akcja: — | Status: —")
         self._effective_action_label.setWordWrap(True)
 
-        self._confirm_button = QPushButton("Potwierdź akcję…")
-        self._confirm_button.setEnabled(False)
-        self._confirm_button.clicked.connect(self._confirm_action)
 
         self._tabs = QTabWidget()
         self._build_preview_tab()
@@ -5931,6 +6448,11 @@ class MainWindow(QMainWindow):
         self._build_settings_tab()
 
         self._workspace = Workspace(self)
+        mirror, rotate = self._workspace.calibration.orientation()
+        self._mirror_button.setChecked(mirror)
+        self._rotate_button.setChecked(rotate)
+        self._mirror_button.toggled.connect(self._change_camera_orientation)
+        self._rotate_button.toggled.connect(self._change_camera_orientation)
         self.setCentralWidget(self._workspace)
 
         self._start_button.clicked.connect(self._start_analysis)
@@ -5953,16 +6475,25 @@ class MainWindow(QMainWindow):
         control_buttons = QVBoxLayout()
         self._start_button.setProperty("primary", True)
         for button in (self._start_button, self._pause_button, self._stop_button,
-                       self._live_toggle_button, self._confirm_button):
+                       self._live_toggle_button):
             control_buttons.addWidget(button)
         controls.addRow(control_buttons)
 
-        diag_group = QGroupBox("Co widzi aplikacja")
+        diag_group = QGroupBox("Stan rozpoznawania")
         diag_layout = QVBoxLayout()
+        self._control_status = QLabel("Kamera nieaktywna")
+        self._control_status.setProperty("role", "status")
+        self._control_status.setWordWrap(True)
+        self._hold_status = QLabel("Przytrzymanie: —")
+        self._hold_status.setProperty("role", "secondary")
+        for item in (self._context_label, self._effective_action_label, self._action_label):
+            item.setTextFormat(Qt.TextFormat.PlainText)
+        diag_layout.addWidget(self._control_status)
         diag_layout.addWidget(self._status_label)
         diag_layout.addWidget(self._diagnostic_label)
         diag_layout.addWidget(self._context_label)
         diag_layout.addWidget(self._effective_action_label)
+        diag_layout.addWidget(self._hold_status)
         diag_layout.addWidget(self._action_label)
         diag_layout.addWidget(self._error_label)
         diag_group.setLayout(diag_layout)
@@ -5980,7 +6511,21 @@ class MainWindow(QMainWindow):
         stage = QVBoxLayout()
         heading = QLabel("Podgląd kamery")
         heading.setProperty("role", "title")
-        stage.addWidget(heading)
+        camera_header = QHBoxLayout()
+        camera_header.addWidget(heading)
+        camera_header.addStretch()
+
+        self._mirror_button = QPushButton("Lustro")
+        self._mirror_button.setCheckable(True)
+        self._mirror_button.setToolTip("Odbij obraz kamery w poziomie")
+
+        self._rotate_button = QPushButton("Obrót 180°")
+        self._rotate_button.setCheckable(True)
+        self._rotate_button.setToolTip("Odwróć obraz kamery do góry nogami")
+
+        camera_header.addWidget(self._mirror_button)
+        camera_header.addWidget(self._rotate_button)
+        stage.addLayout(camera_header)
         stage.addWidget(self._camera_view, 1)
         layout.addLayout(stage, 1)
         inspector = QWidget()
@@ -6145,6 +6690,21 @@ class MainWindow(QMainWindow):
         self._sleep_check = QCheckBox("Zezwól na uśpienie komputera (safety.sleep_computer)")
         self._sleep_check.setChecked(self._config["safety"]["sleep_computer"])
         safety_vbox.addWidget(self._sleep_check)
+        confirmation_hint = QLabel(
+            "Akcje wrażliwe: wybierz, które mogą prosić o jednorazową zgodę. "
+            "Nadal musisz przypisać gest i zezwolić na akcję w profilach."
+        )
+        confirmation_hint.setWordWrap(True)
+        safety_vbox.addWidget(confirmation_hint)
+        self._destructive_checks = {}
+        for action_id, spec in sorted(ACTION_CATALOG.items()):
+            if not spec.destructive or not spec.implemented:
+                continue
+            checkbox = QCheckBox(action_name(action_id, grouped=True))
+            checkbox.setChecked(action_id in self._config["safety"]["confirmed_destructive"])
+            checkbox.setToolTip("Dopuść tylko z osobnym potwierdzeniem przy każdym wykonaniu")
+            safety_vbox.addWidget(checkbox)
+            self._destructive_checks[action_id] = checkbox
         safety_group.setLayout(safety_vbox)
         form_layout.addWidget(safety_group)
 
@@ -6198,6 +6758,38 @@ class MainWindow(QMainWindow):
             return "bindings"
         names = ["Teams", "Browser", "Presentation", "Media", "System"]
         return names[idx - 1]
+
+
+    def _change_camera_orientation(self, _checked: bool) -> None:
+        calibration = self._workspace.calibration
+        if calibration.capture_session:
+            # Nie mieszaj próbek z dwóch orientacji w jednej sesji kalibracji.
+            mirror, rotate = calibration.orientation()
+            for button, value in (
+                (self._mirror_button, mirror),
+                (self._rotate_button, rotate),
+            ):
+                previous = button.blockSignals(True)
+                button.setChecked(value)
+                button.blockSignals(previous)
+            self._error_label.setText(
+                "Zakończ zbieranie próbek przed zmianą orientacji kamery."
+            )
+            return
+
+        mirror = self._mirror_button.isChecked()
+        rotate = self._rotate_button.isChecked()
+        calibration.mirror.setChecked(mirror)
+        calibration.rotate.setChecked(rotate)
+
+        if self._worker is not None:
+            self._worker.set_orientation(mirror, rotate)
+            self._camera_view.clear()
+            self._pause_button.setText("Włącz sterowanie gestami")
+            if not self._demo:
+                self._error_label.setText(
+                    "Zmieniono orientację obrazu. Akcje zostały wstrzymane."
+                )
 
     def _refresh_bindings_table(self) -> None:
         # Wyczyść stary formularz
@@ -6446,11 +7038,11 @@ class MainWindow(QMainWindow):
         self._runtime.set_dry_run(True)
         self._config["execution"]["dry_run"] = True
         self._sync_execution_controls()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
         self._workspace.navigate(1)
         self._error_label.setText(
             "Włączono symulację. Aplikacja nie wykona żadnej akcji. "
-            "Kliknij „Wznów akcje”, potem pokaż gest."
+            "Kliknij „Włącz sterowanie gestami”, potem pokaż gest."
         )
 
     def _save_settings_from_ui(self) -> None:
@@ -6469,6 +7061,11 @@ class MainWindow(QMainWindow):
         new_config["safety"]["enabled"] = self._safety_enabled_check.isChecked()
         new_config["execution"]["dry_run"] = self._dry_run_check.isChecked()
         new_config["safety"]["sleep_computer"] = self._sleep_check.isChecked()
+        previous = set(new_config["safety"]["confirmed_destructive"])
+        previous.difference_update(self._destructive_checks)
+        previous.update(key for key, control in self._destructive_checks.items()
+                        if control.isChecked())
+        new_config["safety"]["confirmed_destructive"] = sorted(previous)
 
         if self._apply_configuration(new_config):
             self._camera_index.setValue(new_config["camera"]["index"])
@@ -6507,7 +7104,7 @@ class MainWindow(QMainWindow):
             self._runtime.apply_config(validated)
             if self._worker is not None:
                 self._worker.apply_config(validated)
-            self._pause_button.setText("Wznów akcje")
+            self._pause_button.setText("Włącz sterowanie gestami")
             is_dry = self._config["execution"]["dry_run"]
             self._live_toggle_button.setText("Tryb: Symulacja" if is_dry else "Tryb: Sterowanie")
             self._sync_execution_controls()
@@ -6529,6 +7126,8 @@ class MainWindow(QMainWindow):
         self._dry_run_check.setChecked(dry_run)
         self._safety_enabled_check.setChecked(self._config["safety"]["enabled"])
         self._sleep_check.setChecked(self._config["safety"]["sleep_computer"])
+        for key, control in self._destructive_checks.items():
+            control.setChecked(key in self._config["safety"]["confirmed_destructive"])
 
     def _toggle_execution_mode(self) -> None:
         if self._demo:
@@ -6543,7 +7142,7 @@ class MainWindow(QMainWindow):
                 "W trybie sterowania gesty będą wysyłać prawdziwe wejścia (skróty klawiszowe, polecenia) "
                 "do aktywnej aplikacji docelowej.\n\n"
                 "Dla bezpieczeństwa po włączeniu możesz w każdej chwili zatrzymać działanie "
-                "przyciskiem „Wstrzymaj akcje” lub „Zakończ sesję”.",
+                "przyciskiem „Wyłącz sterowanie gestami” lub „Zakończ sesję”.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -6551,13 +7150,13 @@ class MainWindow(QMainWindow):
                 self._runtime.set_dry_run(False)
                 self._config["execution"]["dry_run"] = False
                 self._sync_execution_controls()
-                self._pause_button.setText("Wznów akcje")
-                self._error_label.setText("Wybrano sterowanie. Kliknij „Wznów akcje”, aby je uruchomić.")
+                self._pause_button.setText("Włącz sterowanie gestami")
+                self._error_label.setText("Wybrano sterowanie. Kliknij „Włącz sterowanie gestami”, aby je uruchomić.")
         else:
             self._runtime.set_dry_run(True)
             self._config["execution"]["dry_run"] = True
             self._sync_execution_controls()
-            self._pause_button.setText("Wznów akcje")
+            self._pause_button.setText("Włącz sterowanie gestami")
             self._error_label.setText("Wybrano symulację — gesty nie będą sterować komputerem.")
         self._refresh_actions()
 
@@ -6577,13 +7176,19 @@ class MainWindow(QMainWindow):
         self._error_label.setText(self._config_message)
         self._camera_view.clear()
         self._runtime.pause()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
+        calibration = self._workspace.calibration
+        orientation = calibration.orientation()
+        source = self._camera_index.value()
         worker = CameraWorker(
             self._camera_index.value(),
             provider,
             parent=self,
             runtime=None if self._demo else self._runtime,
             camera_settings=self._config["camera"],
+            orientation=orientation,
+            samples=calibration.load(source, orientation)
+            if calibration.enabled.isChecked() and not self._demo else None,
         )
         worker.apply_config(self._config)
         worker.error.connect(self._on_error)
@@ -6649,88 +7254,87 @@ class MainWindow(QMainWindow):
                 if choice != QMessageBox.StandardButton.Yes:
                     return
             self._runtime.resume()
-            self._pause_button.setText("Wstrzymaj akcje")
+            self._pause_button.setText("Wyłącz sterowanie gestami")
         else:
             self._runtime.pause()
-            self._pause_button.setText("Wznów akcje")
+            self._pause_button.setText("Włącz sterowanie gestami")
 
     def _refresh_actions(self) -> None:
+        running = self._worker is not None and self._runtime.is_running
+        paused = self._runtime.safety.paused
+        simulation = self._runtime.executor.dry_run
+        active = running and not paused and not self._demo
+        if self._demo:
+            state, button = "Demo — tylko podgląd", "Sterowanie niedostępne w demo"
+        elif not running:
+            state, button = "Kamera nieaktywna", "Najpierw uruchom kamerę"
+        elif simulation:
+            state = "Symulacja włączona" if active else "Symulacja wyłączona"
+            button = "Wyłącz symulację" if active else "Włącz symulację"
+        else:
+            state = "Sterowanie gestami włączone" if active else "Sterowanie gestami wyłączone"
+            button = "Wyłącz sterowanie gestami" if active else "Włącz sterowanie gestami"
+
         self._workspace.source.setText(
             "Źródło: demo na żywo" if self._demo else
             "Źródło: sesja kamery" if self._worker is not None else "Źródło: kamera nieaktywna"
         )
-        self._pause_button.setEnabled(not self._demo)
+        self._pause_button.setEnabled(running and not self._demo)
+        self._pause_button.setText(button)
+        if self._pause_button.property("controlActive") != active:
+            self._pause_button.setProperty("controlActive", active)
+            self._pause_button.style().unpolish(self._pause_button)
+            self._pause_button.style().polish(self._pause_button)
         self._live_toggle_button.setEnabled(not self._demo)
-        pending = self._runtime.pending_confirmation()
-        self._confirm_button.setEnabled(pending is not None and not self._runtime.safety.paused)
-        outcome = self._runtime.status()
-        state = (
-            "Wstrzymane"
-            if self._runtime.safety.paused
-            else ("Symulacja" if self._config["execution"]["dry_run"] else "Sterowanie")
+        pending = self._runtime.pending_confirmation() if active else None
+        notice_key = pending if pending else None
+        if notice_key != getattr(self, "_last_confirmation_notice", None):
+            self._last_confirmation_notice = notice_key
+            if pending:
+                title = f"Potwierdź: {action_name(pending[0])}"
+                text = "Zostań w tym samym oknie. Przytrzymaj oba kciuki w górę przez 2 sekundy."
+                self.statusBar().showMessage(f"{title} — {text}", 15000)
+                tray = self._workspace.tray
+                if tray is not None and tray.isVisible() and tray.supportsMessages():
+                    tray.showMessage(title, text)
+            else:
+                self.statusBar().clearMessage()
+        outcome = self._runtime.status() if running else None
+        self._control_status.setText(state)
+        self._action_label.setText(
+            "Ostatni wynik: —" if outcome is None else
+            f"Ostatni wynik: {action_name(outcome.action_id)}\n"
+            f"{format_reason_pl(outcome.reason, outcome.action_id)}"
         )
-        detail = (
-            ""
-            if outcome is None
-            else f" | {action_name(outcome.action_id)}: {format_reason_pl(outcome.reason, outcome.action_id)}"
-        )
-        self._action_label.setText("Demo: akcje zablokowane" if self._demo else
-                                   f"Akcje: {state}{detail}")
-        if outcome is not None:
-            self._confirm_button.setToolTip(f"{outcome.action_id}: {outcome.reason}")
-
-        # Aktualizacja rozszerzonego panelu diagnostycznego
-        diag = self._runtime.diagnostics()
-        if diag is not None and not self._demo:
-            fg_name = (
-                Path(diag["foreground_exe"]).name
-                if diag["foreground_exe"]
-                else "Brak / własne okno"
-            )
-            self._context_label.setText(
-                f"Profil: <b>{PROFILES.get(diag['active_profile'], 'Nieustalony')}</b> (Tryb: {PROFILES.get(diag['mode'], 'Nieustalony')}) | "
-                f"Aktywna aplikacja: <b>{escape(fg_name)}</b>"
-            )
-            act = diag["effective_action"]
-            act_text = action_name(act)
-            source = diag["action_source"]
-            reason_pl = format_reason_pl(diag["reason"], act or "")
-            if not diag["reason"]:
-                if not diag.get("consumer_running", True):
-                    reason_pl = "Konsument akcji nie działa — zatrzymaj i uruchom kamerę"
-                else:
-                    reason_pl = "Gotowe do wykonania / oczekiwanie na wynik kolejki"
-            progress = f" | Stabilizacja: {diag.get('stable_ms', 0)}/{diag.get('required_hold_ms', 700)} ms"
+        diag = self._runtime.diagnostics() if running and not self._demo else None
+        if diag is None:
+            self._context_label.setText("Profil: —\nAktywne okno: —")
+            self._effective_action_label.setText("Przypisana akcja: —")
+            self._hold_status.setText("Przytrzymanie: —")
+        else:
+            profile = PROFILES.get(diag["active_profile"], "Nieustalony")
+            foreground = diag["foreground_exe"]
+            window = Path(foreground).name if foreground else "Nie ustalono"
+            self._context_label.setText(f"Profil: {profile}\nAktywne okno: {window}")
+            action = diag["effective_action"]
+            reason = diag["reason"]
+            status = format_reason_pl(reason, action or "") if reason else "Oczekiwanie na wynik"
+            if pending:
+                status = f"Oczekuje na potwierdzenie: {action_name(pending[0])}"
             self._effective_action_label.setText(
-                f"Gest: <b>{gesture_name(diag['signal'])}</b> ➔ Akcja: <b>{act_text}</b> [{source}] | "
-                f"Status: <span style='color: #C9AEFF;'>{reason_pl}</span>{progress}"
+                f"Przypisana akcja: {action_name(action)}\n{status}"
             )
+            required = diag.get("required_hold_ms", 700)
+            stable = min(max(0, diag.get("stable_ms", 0)), required)
+            duration = f"{stable / 1000:.2f} / {required / 1000:.2f} s".replace(".", ",")
+            self._hold_status.setText(f"Przytrzymanie: {duration}" if action else "Przytrzymanie: —")
 
         if self._closing and self._worker is None and not self._runtime.is_running:
             self.close()
 
-    def _confirm_action(self) -> None:
-        pending = self._runtime.pending_confirmation()
-        if pending is None:
-            return
-        answer = QMessageBox.warning(
-            self,
-            "Potwierdzenie jednorazowe",
-            f"Zezwolić na akcję: {action_name(pending[0])}? "
-            "Po zatwierdzeniu wróć do poprzedniego okna i ponownie pokaż gest. "
-            "Potwierdzenie wygaśnie po 5 sekundach. Nie wykonuje starego żądania.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer == QMessageBox.StandardButton.Yes:
-            if self._runtime.confirm_pending():
-                self._error_label.setText("Potwierdzono: wróć do celu i pokaż gest przez 700 ms.")
-            else:
-                self._error_label.setText("Potwierdzenie wygasło lub akcje są wstrzymane.")
-
     def _stop_analysis(self) -> None:
         self._runtime.stop()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
         if self._worker is not None:
             self._stop_button.setEnabled(False)
             self._status_label.setText("Zatrzymywanie…")
@@ -6743,6 +7347,7 @@ class MainWindow(QMainWindow):
         if packet is None:
             return
         frame, result = packet
+        self._workspace.calibration.observe(frame, result)
         drawable_hands = tuple(
             hand
             for hand in result.hands
@@ -6773,6 +7378,7 @@ class MainWindow(QMainWindow):
                 f"Jakość: {QUALITY_NAMES.get(analysis.quality.value, 'Nieustalona')} | "
                 f"Przerwa po geście: {analysis.cooldown_ms / 1000:.1f} s\n"
                 + GESTURES.get(analysis.gesture.value, ("", ""))[1]
+                + (" · Dopasowanie osobiste" if analysis.calibrated else "")
             )
         if self._failed:
             return
@@ -6789,7 +7395,7 @@ class MainWindow(QMainWindow):
 
     def _on_error(self, message: str) -> None:
         self._runtime.stop()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
         self._failed = True
         self._status_label.setText("Błąd kamery lub detekcji dłoni.")
         self._error_label.setText(message)
@@ -6798,11 +7404,12 @@ class MainWindow(QMainWindow):
 
     def _on_worker_finished(self) -> None:
         self._runtime.stop()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
         self._timer.stop()
         worker = self._worker
         self._worker = None
         self._demo = False
+        self._workspace.calibration.finished()
         if worker is not None:
             worker.deleteLater()
         self._start_button.setEnabled(True)
@@ -6883,6 +7490,9 @@ def get_stylesheet() -> str:
     QPushButton[nav="true"]:checked {{ background: {t.RAISED}; color: {t.MAGENTA};
         border-color: {t.MAGENTA}; }}
     QPushButton[primary="true"] {{ background: {t.ACCENT}; color: {t.BACKGROUND}; }}
+    QPushButton[controlActive="true"] {{
+        background: {t.ACCENT}; color: {t.BACKGROUND}; border-color: {t.ACCENT};
+    }}
     QPushButton:hover {{ border-color: {t.SECONDARY}; }}
     QPushButton:pressed {{ border-color: {t.ACCENT}; }}
     QPushButton:disabled, QPushButton[primary="true"]:disabled {{
@@ -6924,11 +7534,16 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QFrame,
     QHBoxLayout, QLabel, QListWidget, QMenu, QMessageBox, QPushButton, QScrollArea,
-    QSpinBox, QStackedWidget, QSystemTrayIcon, QVBoxLayout, QWidget,
+    QSpinBox, QStackedWidget, QSystemTrayIcon, QVBoxLayout, QWidget, QCheckBox,
 )
 
 from src.gesture_assistant.ui import tokens
+from src.gesture_assistant.ui.calibration import CalibrationPage
 from src.gesture_assistant.ui.display_names import action_name
+
+from copy import deepcopy
+
+from src.gesture_assistant.integrations import ACTION_CATALOG
 
 
 def label(text, role="secondary"):
@@ -6984,7 +7599,7 @@ class Workspace(QWidget):
         nav.addWidget(label("GestureAssistant", "title"))
         self.pages = QStackedWidget()
         self.nav = []
-        for index, text in enumerate(("Start", "Trening", "Historia", "Ustawienia")):
+        for index, text in enumerate(("Start", "Podgląd i sterowanie", "Historia", "Ustawienia", "Kalibracja gestów")):
             button = QPushButton(text)
             button.setCheckable(True)
             button.setProperty("nav", True)
@@ -7041,14 +7656,20 @@ class Workspace(QWidget):
         settings = QStackedWidget()
         settings.addWidget(bindings)
         settings.addWidget(parameters)
+        settings.addWidget(self._build_confirmation_settings())
         container, options = card()
         options.addWidget(label("Ustawienia", "title"))
         selector = QComboBox()
-        selector.addItems(("Profile akcji", "Gesty, ruchy i bezpieczeństwo"))
+        selector.addItems(
+            ("Profile akcji", "Gesty, ruchy i bezpieczeństwo", "Potwierdzanie akcji")
+        )
+        selector.currentIndexChanged.connect(self._load_confirmation_settings)
         selector.currentIndexChanged.connect(settings.setCurrentIndex)
         options.addWidget(selector)
         options.addWidget(settings, 1)
         self.pages.addWidget(container)
+        self.calibration = CalibrationPage(window)
+        self.pages.addWidget(scroll(self.calibration))
         self.visible_records = []
         self.navigate(0)
         self.refresh_history()
@@ -7118,6 +7739,80 @@ class Workspace(QWidget):
             self.window._camera_index.setValue(camera.value())
             self.navigate(1)
             self.window._start_analysis()
+
+
+    def _build_confirmation_settings(self):
+        page, layout = card()
+        layout.addWidget(label("Potwierdzanie akcji", "title"))
+        layout.addWidget(
+            label(
+                "Wybierz, które akcje mogą prosić o jednorazową zgodę. "
+                "Każdą akcję nadal trzeba przypisać do gestu i dopuścić "
+                "w profilach. Zaznaczenie poniżej nie wykonuje żadnej akcji."
+            )
+        )
+
+        self._confirmation_checks = {}
+        for action_id, spec in sorted(
+            ACTION_CATALOG.items(),
+            key=lambda item: action_name(item[0], grouped=True),
+        ):
+            if not spec.destructive or not spec.implemented:
+                continue
+
+            checkbox = QCheckBox(action_name(action_id, grouped=True))
+            checkbox.setToolTip(
+                "Aplikacja poprosi o osobną zgodę przy każdym wykonaniu."
+            )
+            layout.addWidget(checkbox)
+            self._confirmation_checks[action_id] = checkbox
+
+        self._confirmation_notice = label("")
+        layout.addWidget(self._confirmation_notice)
+
+        save = QPushButton("Zapisz zasady potwierdzania")
+        save.setProperty("primary", True)
+        save.clicked.connect(self._save_confirmation_settings)
+        layout.addWidget(save)
+        layout.addStretch()
+
+        self._load_confirmation_settings(2)
+        return scroll(page)
+
+    def _load_confirmation_settings(self, index):
+        if index != 2:
+            return
+        saved = set(self.window._config["safety"]["confirmed_destructive"])
+        for action_id, checkbox in self._confirmation_checks.items():
+            checkbox.setChecked(action_id in saved)
+        self._confirmation_notice.clear()
+
+    def _save_confirmation_settings(self):
+        if self.window._demo:
+            self._confirmation_notice.setText(
+                "Zakończ demo lub kalibrację przed zapisaniem tych ustawień."
+            )
+            return
+
+        config = deepcopy(self.window._config)
+        confirmed = set(config["safety"]["confirmed_destructive"])
+        confirmed.difference_update(self._confirmation_checks)
+        confirmed.update(
+            action_id
+            for action_id, checkbox in self._confirmation_checks.items()
+            if checkbox.isChecked()
+        )
+        config["safety"]["confirmed_destructive"] = sorted(confirmed)
+
+        if self.window._apply_configuration(config):
+            self._confirmation_notice.setText(
+                "Zapisano zasady potwierdzania. Aby użyć gestu, ponownie "
+                "włącz sterowanie w widoku kamery."
+            )
+        else:
+            self._confirmation_notice.setText(
+                "Nie udało się zapisać zasad. Sprawdź komunikat błędu."
+            )
 
     def open_demo(self):
         if self.window._worker is not None or self.window._runtime.is_running:
@@ -7211,6 +7906,7 @@ def format_duration_ms(duration_ms: int) -> str:
 ========== PLIK: src\gesture_assistant\vision\__init__.py ==========
 """Przechwytywanie obrazu, MediaPipe i ocena jakości detekcji."""
 
+
 ========== KONIEC PLIKU ==========
 
 ========== PLIK: src\gesture_assistant\vision\camera_worker.py ==========
@@ -7246,6 +7942,8 @@ class CameraWorker(QThread):
         parent=None,
         runtime=None,
         camera_settings=None,
+        orientation=(False, False),
+        samples=None,
     ) -> None:
         super().__init__(parent)
 
@@ -7263,7 +7961,23 @@ class CameraWorker(QThread):
         self._analysis = None
         self._pipeline = AnalysisPipeline()
         self._runtime = runtime
+        self._orientation = orientation
+        self._pipeline.samples = samples or {}
+        if runtime is not None:
+            self._pipeline.active_signals = getattr(runtime, "active_gesture_signals", lambda: set())
         self._camera_settings = camera_settings
+        self._applied_orientation = orientation
+
+    def set_orientation(self, mirror: bool, rotate: bool) -> None:
+        if self._runtime is not None:
+            self._runtime.pause()
+            self._runtime.cancel_pending()
+
+        orientation = (mirror, rotate)
+        with self._preview_lock:
+            self._orientation = orientation
+            self._preview = None
+            self._analysis = None
 
     def run(self) -> None:
         capture_thread = threading.Thread(
@@ -7298,6 +8012,21 @@ class CameraWorker(QThread):
 
                 last_analysis_start = monotonic_ms()
                 try:
+                    with self._preview_lock:
+                        orientation = self._orientation
+
+
+                        self._pipeline.smoother.reset()
+                        self._pipeline.motions.classifier.reset()
+                        self._pipeline.gestures.debouncer.tracking_discontinuity()
+                        self._pipeline.samples = {}
+                        self._applied_orientation = orientation
+
+                    mirror, rotate = orientation
+                    if rotate:
+                        frame = cv2.flip(frame, -1)
+                    if mirror:
+                        frame = cv2.flip(frame, 1)
                     result = self._provider.process(frame, timestamp_ms)
                     analysis = self._pipeline.process(result, frame.shape[1], frame.shape[0])
                     if self._runtime is not None:

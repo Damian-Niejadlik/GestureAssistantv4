@@ -41,6 +41,9 @@ def get_stylesheet() -> str:
     QPushButton[nav="true"]:checked {{ background: {t.RAISED}; color: {t.MAGENTA};
         border-color: {t.MAGENTA}; }}
     QPushButton[primary="true"] {{ background: {t.ACCENT}; color: {t.BACKGROUND}; }}
+    QPushButton[controlActive="true"] {{
+        background: {t.ACCENT}; color: {t.BACKGROUND}; border-color: {t.ACCENT};
+    }}
     QPushButton:hover {{ border-color: {t.SECONDARY}; }}
     QPushButton:pressed {{ border-color: {t.ACCENT}; }}
     QPushButton:disabled, QPushButton[primary="true"]:disabled {{

@@ -247,6 +247,19 @@ class SafetyManager:
             self._config = validate_config(config)
             self._invalidate()
 
+    def request_gesture_confirmation(self, action_id, context, opened_at, deadline):
+        with self._lock:
+            now = self.clock()
+            signal = Gesture.DOUBLE_THUMBS_UP.value
+            if (now >= deadline or self._since is None or self._since < opened_at
+                    or self._last is None or self._last - self._since < 2000
+                    or self._gesture.value != signal):
+                return None
+            request = self.request(action_id, signal, context)
+            if request is not None:
+                self._confirmations[action_id] = (context.identity, deadline)
+            return request
+
     def request(self, action_id, signal, context):
         with self._lock:
             now = self.clock()
@@ -357,6 +370,10 @@ class SafetyManager:
                 return "gesture_changed"
             action = ACTION_CATALOG[request.action_id]
             if action.destructive:
+                if request.signal == Gesture.DOUBLE_THUMBS_UP.value and (
+                    self._since is None or self._last - self._since < 2000
+                ):
+                    return "gesture_not_stable_700ms"
                 if request.action_id not in self._config["safety"]["confirmed_destructive"]:
                     return "destructive_not_enabled_in_settings"
                 confirmation = self._confirmations.pop(request.action_id, None)

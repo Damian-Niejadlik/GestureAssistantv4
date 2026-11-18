@@ -7,12 +7,16 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QFrame,
     QHBoxLayout, QLabel, QListWidget, QMenu, QMessageBox, QPushButton, QScrollArea,
-    QSpinBox, QStackedWidget, QSystemTrayIcon, QVBoxLayout, QWidget,
+    QSpinBox, QStackedWidget, QSystemTrayIcon, QVBoxLayout, QWidget, QCheckBox,
 )
 
 from src.gesture_assistant.ui import tokens
 from src.gesture_assistant.ui.calibration import CalibrationPage
 from src.gesture_assistant.ui.display_names import action_name
+
+from copy import deepcopy
+
+from src.gesture_assistant.integrations import ACTION_CATALOG
 
 
 def label(text, role="secondary"):
@@ -68,7 +72,7 @@ class Workspace(QWidget):
         nav.addWidget(label("GestureAssistant", "title"))
         self.pages = QStackedWidget()
         self.nav = []
-        for index, text in enumerate(("Start", "Trening", "Historia", "Ustawienia", "Kalibracja gestów")):
+        for index, text in enumerate(("Start", "Podgląd i sterowanie", "Historia", "Ustawienia", "Kalibracja gestów")):
             button = QPushButton(text)
             button.setCheckable(True)
             button.setProperty("nav", True)
@@ -125,10 +129,14 @@ class Workspace(QWidget):
         settings = QStackedWidget()
         settings.addWidget(bindings)
         settings.addWidget(parameters)
+        settings.addWidget(self._build_confirmation_settings())
         container, options = card()
         options.addWidget(label("Ustawienia", "title"))
         selector = QComboBox()
-        selector.addItems(("Profile akcji", "Gesty, ruchy i bezpieczeństwo"))
+        selector.addItems(
+            ("Profile akcji", "Gesty, ruchy i bezpieczeństwo", "Potwierdzanie akcji")
+        )
+        selector.currentIndexChanged.connect(self._load_confirmation_settings)
         selector.currentIndexChanged.connect(settings.setCurrentIndex)
         options.addWidget(selector)
         options.addWidget(settings, 1)
@@ -204,6 +212,80 @@ class Workspace(QWidget):
             self.window._camera_index.setValue(camera.value())
             self.navigate(1)
             self.window._start_analysis()
+
+
+    def _build_confirmation_settings(self):
+        page, layout = card()
+        layout.addWidget(label("Potwierdzanie akcji", "title"))
+        layout.addWidget(
+            label(
+                "Wybierz, które akcje mogą prosić o jednorazową zgodę. "
+                "Każdą akcję nadal trzeba przypisać do gestu i dopuścić "
+                "w profilach. Zaznaczenie poniżej nie wykonuje żadnej akcji."
+            )
+        )
+
+        self._confirmation_checks = {}
+        for action_id, spec in sorted(
+            ACTION_CATALOG.items(),
+            key=lambda item: action_name(item[0], grouped=True),
+        ):
+            if not spec.destructive or not spec.implemented:
+                continue
+
+            checkbox = QCheckBox(action_name(action_id, grouped=True))
+            checkbox.setToolTip(
+                "Aplikacja poprosi o osobną zgodę przy każdym wykonaniu."
+            )
+            layout.addWidget(checkbox)
+            self._confirmation_checks[action_id] = checkbox
+
+        self._confirmation_notice = label("")
+        layout.addWidget(self._confirmation_notice)
+
+        save = QPushButton("Zapisz zasady potwierdzania")
+        save.setProperty("primary", True)
+        save.clicked.connect(self._save_confirmation_settings)
+        layout.addWidget(save)
+        layout.addStretch()
+
+        self._load_confirmation_settings(2)
+        return scroll(page)
+
+    def _load_confirmation_settings(self, index):
+        if index != 2:
+            return
+        saved = set(self.window._config["safety"]["confirmed_destructive"])
+        for action_id, checkbox in self._confirmation_checks.items():
+            checkbox.setChecked(action_id in saved)
+        self._confirmation_notice.clear()
+
+    def _save_confirmation_settings(self):
+        if self.window._demo:
+            self._confirmation_notice.setText(
+                "Zakończ demo lub kalibrację przed zapisaniem tych ustawień."
+            )
+            return
+
+        config = deepcopy(self.window._config)
+        confirmed = set(config["safety"]["confirmed_destructive"])
+        confirmed.difference_update(self._confirmation_checks)
+        confirmed.update(
+            action_id
+            for action_id, checkbox in self._confirmation_checks.items()
+            if checkbox.isChecked()
+        )
+        config["safety"]["confirmed_destructive"] = sorted(confirmed)
+
+        if self.window._apply_configuration(config):
+            self._confirmation_notice.setText(
+                "Zapisano zasady potwierdzania. Aby użyć gestu, ponownie "
+                "włącz sterowanie w widoku kamery."
+            )
+        else:
+            self._confirmation_notice.setText(
+                "Nie udało się zapisać zasad. Sprawdź komunikat błędu."
+            )
 
     def open_demo(self):
         if self.window._worker is not None or self.window._runtime.is_running:

@@ -1,7 +1,6 @@
 import math
 import time
 from copy import deepcopy
-from html import escape
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
@@ -105,7 +104,7 @@ REASON_TRANSLATIONS = {
     "gesture_changed": "Zmieniono gest przed wykonaniem",
     "gesture_latched": "Gest już wykonany — zwolnij dłoń przed ponowieniem",
     "expired_request": "Zdarzenie wygasło w kolejce",
-    "explicit_confirmation_required": "Wymagane jednorazowe potwierdzenie w GUI",
+    "explicit_confirmation_required": "Potwierdź: przytrzymaj oba kciuki w górę przez 2 sekundy",
     "destructive_not_enabled_in_settings": "Akcja destrukcyjna nie jest aktywowana w ustawieniach",
     "authorization_changed": "Autoryzacja wygasła (zmiana aktywnego okna lub utrata dłoni)",
     "dry_run_no_side_effect": "Symulacja — rozpoznano gest, ale niczego nie wykonano",
@@ -116,6 +115,10 @@ REASON_TRANSLATIONS = {
 
 
 def format_reason_pl(reason: str, action_id: str = "") -> str:
+    if action_id == "system.close_active_window" and (
+        reason == "executed" or reason.startswith("executed:")
+    ):
+        return "Wysłano Alt+F4 — nie sprawdzono, czy okno się zamknęło"
     if action_id == "browser.open_url" and reason.startswith("executed"):
         return "Przekazano URL do przeglądarki domyślnej (bez potwierdzenia załadowania)"
     if not reason:
@@ -168,7 +171,7 @@ class MainWindow(QMainWindow):
         self._start_button = QPushButton("Start")
         self._stop_button = QPushButton("Zakończ sesję")
         self._stop_button.setEnabled(False)
-        self._pause_button = QPushButton("Wznów akcje")
+        self._pause_button = QPushButton("Włącz sterowanie gestami")
         self._pause_button.clicked.connect(self._toggle_actions_pause)
 
         is_dry = self._config["execution"]["dry_run"]
@@ -194,7 +197,7 @@ class MainWindow(QMainWindow):
         self._error_label = QLabel(self._config_message)
         self._error_label.setWordWrap(True)
         self._error_label.setStyleSheet("color: #ff6b6b;")
-        self._action_label = QLabel("Wznów akcje")
+        self._action_label = QLabel("Włącz sterowanie gestami")
         self._action_label.setWordWrap(True)
 
         self._context_label = QLabel("Profil: — | Aktywna aplikacja: —")
@@ -202,9 +205,6 @@ class MainWindow(QMainWindow):
         self._effective_action_label = QLabel("Efektywna akcja: — | Status: —")
         self._effective_action_label.setWordWrap(True)
 
-        self._confirm_button = QPushButton("Potwierdź akcję…")
-        self._confirm_button.setEnabled(False)
-        self._confirm_button.clicked.connect(self._confirm_action)
 
         self._tabs = QTabWidget()
         self._build_preview_tab()
@@ -239,16 +239,25 @@ class MainWindow(QMainWindow):
         control_buttons = QVBoxLayout()
         self._start_button.setProperty("primary", True)
         for button in (self._start_button, self._pause_button, self._stop_button,
-                       self._live_toggle_button, self._confirm_button):
+                       self._live_toggle_button):
             control_buttons.addWidget(button)
         controls.addRow(control_buttons)
 
-        diag_group = QGroupBox("Co widzi aplikacja")
+        diag_group = QGroupBox("Stan rozpoznawania")
         diag_layout = QVBoxLayout()
+        self._control_status = QLabel("Kamera nieaktywna")
+        self._control_status.setProperty("role", "status")
+        self._control_status.setWordWrap(True)
+        self._hold_status = QLabel("Przytrzymanie: —")
+        self._hold_status.setProperty("role", "secondary")
+        for item in (self._context_label, self._effective_action_label, self._action_label):
+            item.setTextFormat(Qt.TextFormat.PlainText)
+        diag_layout.addWidget(self._control_status)
         diag_layout.addWidget(self._status_label)
         diag_layout.addWidget(self._diagnostic_label)
         diag_layout.addWidget(self._context_label)
         diag_layout.addWidget(self._effective_action_label)
+        diag_layout.addWidget(self._hold_status)
         diag_layout.addWidget(self._action_label)
         diag_layout.addWidget(self._error_label)
         diag_group.setLayout(diag_layout)
@@ -445,6 +454,21 @@ class MainWindow(QMainWindow):
         self._sleep_check = QCheckBox("Zezwól na uśpienie komputera (safety.sleep_computer)")
         self._sleep_check.setChecked(self._config["safety"]["sleep_computer"])
         safety_vbox.addWidget(self._sleep_check)
+        confirmation_hint = QLabel(
+            "Akcje wrażliwe: wybierz, które mogą prosić o jednorazową zgodę. "
+            "Nadal musisz przypisać gest i zezwolić na akcję w profilach."
+        )
+        confirmation_hint.setWordWrap(True)
+        safety_vbox.addWidget(confirmation_hint)
+        self._destructive_checks = {}
+        for action_id, spec in sorted(ACTION_CATALOG.items()):
+            if not spec.destructive or not spec.implemented:
+                continue
+            checkbox = QCheckBox(action_name(action_id, grouped=True))
+            checkbox.setChecked(action_id in self._config["safety"]["confirmed_destructive"])
+            checkbox.setToolTip("Dopuść tylko z osobnym potwierdzeniem przy każdym wykonaniu")
+            safety_vbox.addWidget(checkbox)
+            self._destructive_checks[action_id] = checkbox
         safety_group.setLayout(safety_vbox)
         form_layout.addWidget(safety_group)
 
@@ -525,7 +549,7 @@ class MainWindow(QMainWindow):
         if self._worker is not None:
             self._worker.set_orientation(mirror, rotate)
             self._camera_view.clear()
-            self._pause_button.setText("Wznów akcje")
+            self._pause_button.setText("Włącz sterowanie gestami")
             if not self._demo:
                 self._error_label.setText(
                     "Zmieniono orientację obrazu. Akcje zostały wstrzymane."
@@ -778,11 +802,11 @@ class MainWindow(QMainWindow):
         self._runtime.set_dry_run(True)
         self._config["execution"]["dry_run"] = True
         self._sync_execution_controls()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
         self._workspace.navigate(1)
         self._error_label.setText(
             "Włączono symulację. Aplikacja nie wykona żadnej akcji. "
-            "Kliknij „Wznów akcje”, potem pokaż gest."
+            "Kliknij „Włącz sterowanie gestami”, potem pokaż gest."
         )
 
     def _save_settings_from_ui(self) -> None:
@@ -801,6 +825,11 @@ class MainWindow(QMainWindow):
         new_config["safety"]["enabled"] = self._safety_enabled_check.isChecked()
         new_config["execution"]["dry_run"] = self._dry_run_check.isChecked()
         new_config["safety"]["sleep_computer"] = self._sleep_check.isChecked()
+        previous = set(new_config["safety"]["confirmed_destructive"])
+        previous.difference_update(self._destructive_checks)
+        previous.update(key for key, control in self._destructive_checks.items()
+                        if control.isChecked())
+        new_config["safety"]["confirmed_destructive"] = sorted(previous)
 
         if self._apply_configuration(new_config):
             self._camera_index.setValue(new_config["camera"]["index"])
@@ -839,7 +868,7 @@ class MainWindow(QMainWindow):
             self._runtime.apply_config(validated)
             if self._worker is not None:
                 self._worker.apply_config(validated)
-            self._pause_button.setText("Wznów akcje")
+            self._pause_button.setText("Włącz sterowanie gestami")
             is_dry = self._config["execution"]["dry_run"]
             self._live_toggle_button.setText("Tryb: Symulacja" if is_dry else "Tryb: Sterowanie")
             self._sync_execution_controls()
@@ -861,6 +890,8 @@ class MainWindow(QMainWindow):
         self._dry_run_check.setChecked(dry_run)
         self._safety_enabled_check.setChecked(self._config["safety"]["enabled"])
         self._sleep_check.setChecked(self._config["safety"]["sleep_computer"])
+        for key, control in self._destructive_checks.items():
+            control.setChecked(key in self._config["safety"]["confirmed_destructive"])
 
     def _toggle_execution_mode(self) -> None:
         if self._demo:
@@ -875,7 +906,7 @@ class MainWindow(QMainWindow):
                 "W trybie sterowania gesty będą wysyłać prawdziwe wejścia (skróty klawiszowe, polecenia) "
                 "do aktywnej aplikacji docelowej.\n\n"
                 "Dla bezpieczeństwa po włączeniu możesz w każdej chwili zatrzymać działanie "
-                "przyciskiem „Wstrzymaj akcje” lub „Zakończ sesję”.",
+                "przyciskiem „Wyłącz sterowanie gestami” lub „Zakończ sesję”.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -883,13 +914,13 @@ class MainWindow(QMainWindow):
                 self._runtime.set_dry_run(False)
                 self._config["execution"]["dry_run"] = False
                 self._sync_execution_controls()
-                self._pause_button.setText("Wznów akcje")
-                self._error_label.setText("Wybrano sterowanie. Kliknij „Wznów akcje”, aby je uruchomić.")
+                self._pause_button.setText("Włącz sterowanie gestami")
+                self._error_label.setText("Wybrano sterowanie. Kliknij „Włącz sterowanie gestami”, aby je uruchomić.")
         else:
             self._runtime.set_dry_run(True)
             self._config["execution"]["dry_run"] = True
             self._sync_execution_controls()
-            self._pause_button.setText("Wznów akcje")
+            self._pause_button.setText("Włącz sterowanie gestami")
             self._error_label.setText("Wybrano symulację — gesty nie będą sterować komputerem.")
         self._refresh_actions()
 
@@ -909,7 +940,7 @@ class MainWindow(QMainWindow):
         self._error_label.setText(self._config_message)
         self._camera_view.clear()
         self._runtime.pause()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
         calibration = self._workspace.calibration
         orientation = calibration.orientation()
         source = self._camera_index.value()
@@ -987,88 +1018,87 @@ class MainWindow(QMainWindow):
                 if choice != QMessageBox.StandardButton.Yes:
                     return
             self._runtime.resume()
-            self._pause_button.setText("Wstrzymaj akcje")
+            self._pause_button.setText("Wyłącz sterowanie gestami")
         else:
             self._runtime.pause()
-            self._pause_button.setText("Wznów akcje")
+            self._pause_button.setText("Włącz sterowanie gestami")
 
     def _refresh_actions(self) -> None:
+        running = self._worker is not None and self._runtime.is_running
+        paused = self._runtime.safety.paused
+        simulation = self._runtime.executor.dry_run
+        active = running and not paused and not self._demo
+        if self._demo:
+            state, button = "Demo — tylko podgląd", "Sterowanie niedostępne w demo"
+        elif not running:
+            state, button = "Kamera nieaktywna", "Najpierw uruchom kamerę"
+        elif simulation:
+            state = "Symulacja włączona" if active else "Symulacja wyłączona"
+            button = "Wyłącz symulację" if active else "Włącz symulację"
+        else:
+            state = "Sterowanie gestami włączone" if active else "Sterowanie gestami wyłączone"
+            button = "Wyłącz sterowanie gestami" if active else "Włącz sterowanie gestami"
+
         self._workspace.source.setText(
             "Źródło: demo na żywo" if self._demo else
             "Źródło: sesja kamery" if self._worker is not None else "Źródło: kamera nieaktywna"
         )
-        self._pause_button.setEnabled(not self._demo)
+        self._pause_button.setEnabled(running and not self._demo)
+        self._pause_button.setText(button)
+        if self._pause_button.property("controlActive") != active:
+            self._pause_button.setProperty("controlActive", active)
+            self._pause_button.style().unpolish(self._pause_button)
+            self._pause_button.style().polish(self._pause_button)
         self._live_toggle_button.setEnabled(not self._demo)
-        pending = self._runtime.pending_confirmation()
-        self._confirm_button.setEnabled(pending is not None and not self._runtime.safety.paused)
-        outcome = self._runtime.status()
-        state = (
-            "Wstrzymane"
-            if self._runtime.safety.paused
-            else ("Symulacja" if self._config["execution"]["dry_run"] else "Sterowanie")
+        pending = self._runtime.pending_confirmation() if active else None
+        notice_key = pending if pending else None
+        if notice_key != getattr(self, "_last_confirmation_notice", None):
+            self._last_confirmation_notice = notice_key
+            if pending:
+                title = f"Potwierdź: {action_name(pending[0])}"
+                text = "Zostań w tym samym oknie. Przytrzymaj oba kciuki w górę przez 2 sekundy."
+                self.statusBar().showMessage(f"{title} — {text}", 15000)
+                tray = self._workspace.tray
+                if tray is not None and tray.isVisible() and tray.supportsMessages():
+                    tray.showMessage(title, text)
+            else:
+                self.statusBar().clearMessage()
+        outcome = self._runtime.status() if running else None
+        self._control_status.setText(state)
+        self._action_label.setText(
+            "Ostatni wynik: —" if outcome is None else
+            f"Ostatni wynik: {action_name(outcome.action_id)}\n"
+            f"{format_reason_pl(outcome.reason, outcome.action_id)}"
         )
-        detail = (
-            ""
-            if outcome is None
-            else f" | {action_name(outcome.action_id)}: {format_reason_pl(outcome.reason, outcome.action_id)}"
-        )
-        self._action_label.setText("Demo: akcje zablokowane" if self._demo else
-                                   f"Akcje: {state}{detail}")
-        if outcome is not None:
-            self._confirm_button.setToolTip(f"{outcome.action_id}: {outcome.reason}")
-
-        # Aktualizacja rozszerzonego panelu diagnostycznego
-        diag = self._runtime.diagnostics()
-        if diag is not None and not self._demo:
-            fg_name = (
-                Path(diag["foreground_exe"]).name
-                if diag["foreground_exe"]
-                else "Brak / własne okno"
-            )
-            self._context_label.setText(
-                f"Profil: <b>{PROFILES.get(diag['active_profile'], 'Nieustalony')}</b> (Tryb: {PROFILES.get(diag['mode'], 'Nieustalony')}) | "
-                f"Aktywna aplikacja: <b>{escape(fg_name)}</b>"
-            )
-            act = diag["effective_action"]
-            act_text = action_name(act)
-            source = diag["action_source"]
-            reason_pl = format_reason_pl(diag["reason"], act or "")
-            if not diag["reason"]:
-                if not diag.get("consumer_running", True):
-                    reason_pl = "Konsument akcji nie działa — zatrzymaj i uruchom kamerę"
-                else:
-                    reason_pl = "Gotowe do wykonania / oczekiwanie na wynik kolejki"
-            progress = f" | Stabilizacja: {diag.get('stable_ms', 0)}/{diag.get('required_hold_ms', 700)} ms"
+        diag = self._runtime.diagnostics() if running and not self._demo else None
+        if diag is None:
+            self._context_label.setText("Profil: —\nAktywne okno: —")
+            self._effective_action_label.setText("Przypisana akcja: —")
+            self._hold_status.setText("Przytrzymanie: —")
+        else:
+            profile = PROFILES.get(diag["active_profile"], "Nieustalony")
+            foreground = diag["foreground_exe"]
+            window = Path(foreground).name if foreground else "Nie ustalono"
+            self._context_label.setText(f"Profil: {profile}\nAktywne okno: {window}")
+            action = diag["effective_action"]
+            reason = diag["reason"]
+            status = format_reason_pl(reason, action or "") if reason else "Oczekiwanie na wynik"
+            if pending:
+                status = f"Oczekuje na potwierdzenie: {action_name(pending[0])}"
             self._effective_action_label.setText(
-                f"Gest: <b>{gesture_name(diag['signal'])}</b> ➔ Akcja: <b>{act_text}</b> [{source}] | "
-                f"Status: <span style='color: #C9AEFF;'>{reason_pl}</span>{progress}"
+                f"Przypisana akcja: {action_name(action)}\n{status}"
             )
+            required = diag.get("required_hold_ms", 700)
+            stable = min(max(0, diag.get("stable_ms", 0)), required)
+            duration = f"{stable / 1000:.2f} / {required / 1000:.2f} s".replace(".", ",")
+            self._hold_status.setText(f"Przytrzymanie: {duration}" if action else "Przytrzymanie: —")
 
         if self._closing and self._worker is None and not self._runtime.is_running:
             self.close()
 
-    def _confirm_action(self) -> None:
-        pending = self._runtime.pending_confirmation()
-        if pending is None:
-            return
-        answer = QMessageBox.warning(
-            self,
-            "Potwierdzenie jednorazowe",
-            f"Zezwolić na akcję: {action_name(pending[0])}? "
-            "Po zatwierdzeniu wróć do poprzedniego okna i ponownie pokaż gest. "
-            "Potwierdzenie wygaśnie po 5 sekundach. Nie wykonuje starego żądania.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer == QMessageBox.StandardButton.Yes:
-            if self._runtime.confirm_pending():
-                self._error_label.setText("Potwierdzono: wróć do celu i pokaż gest przez 700 ms.")
-            else:
-                self._error_label.setText("Potwierdzenie wygasło lub akcje są wstrzymane.")
-
     def _stop_analysis(self) -> None:
         self._runtime.stop()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
         if self._worker is not None:
             self._stop_button.setEnabled(False)
             self._status_label.setText("Zatrzymywanie…")
@@ -1129,7 +1159,7 @@ class MainWindow(QMainWindow):
 
     def _on_error(self, message: str) -> None:
         self._runtime.stop()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
         self._failed = True
         self._status_label.setText("Błąd kamery lub detekcji dłoni.")
         self._error_label.setText(message)
@@ -1138,7 +1168,7 @@ class MainWindow(QMainWindow):
 
     def _on_worker_finished(self) -> None:
         self._runtime.stop()
-        self._pause_button.setText("Wznów akcje")
+        self._pause_button.setText("Włącz sterowanie gestami")
         self._timer.stop()
         worker = self._worker
         self._worker = None

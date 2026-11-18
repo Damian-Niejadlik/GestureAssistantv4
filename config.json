@@ -28,10 +28,16 @@
     "paused": true,
     "enabled": true,
     "sleep_computer": true,
-    "confirmed_destructive": []
+    "confirmed_destructive": [
+      "system.close_active_window"
+    ]
   },
-  "allowed_actions": [],
-  "bindings": {},
+  "allowed_actions": [
+    "system.close_active_window"
+  ],
+  "bindings": {
+    "OPEN_PALM": "system.close_active_window"
+  },
   "targets": {
     "applications": {},
     "urls": {

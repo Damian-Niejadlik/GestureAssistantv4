@@ -119,11 +119,29 @@ class ActionRuntime:
 
         if not observed or self.safety.paused or not config["safety"]["enabled"]:
             return
+        with self._lock:
+            pending = self._confirmation
+            confirmation_signal = signal == "DOUBLE_THUMBS_UP"
+            if pending is not None:
+                action_id, target, deadline = pending
+                now = self.safety.clock()
+                if now >= deadline or context.identity != target.identity:
+                    self._confirmation = None
+                    return
+                if observed and confirmation_signal:
+                    request = self.safety.request_gesture_confirmation(
+                        action_id, context, deadline - 15000, deadline,
+                    )
+                    if request is not None:
+                        if self.queue.put(request):
+                            self._confirmation = None
+                        else:
+                            self.safety.discard(request)
+                return
+            if confirmation_signal:
+                return  # Reserved for confirmations; never dispatch a normal binding.
         if action is None:
             return
-        with self._lock:
-            if self._confirmation is not None and self._confirmation[0] == action:
-                return
         request = self.safety.request(action, signal, context)
         if request is not None and not self.queue.put(request):
             self.safety.discard(request)
@@ -167,7 +185,8 @@ class ActionRuntime:
 
     def _need_confirmation(self, action_id, context):
         with self._lock:
-            self._confirmation = (action_id, context, self.safety.clock() + 15000)
+            if not self._stop.is_set() and not self.safety.paused and self._confirmation is None:
+                self._confirmation = (action_id, context, self.safety.clock() + 15000)
 
     def pending_confirmation(self):
         with self._lock:
