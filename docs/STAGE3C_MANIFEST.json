@@ -1,0 +1,79 @@
+{
+  "base_export": "2026-11-17 21:01:23",
+  "python": "3.12.8",
+  "new_files": [
+    "docs/STAGE3C_COMMANDS.txt",
+    "docs/STAGE3C_LOG.txt",
+    "docs/VERIFICATION_3C.md",
+    "tests/integration_samples.py",
+    "tests/test_context_reader.py",
+    "tests/test_integrations_final.py",
+    "tests/test_media_actions.py",
+    "tests/test_presentation_actions.py",
+    "tests/test_runtime_lifecycle.py"
+  ],
+  "modified_files": [
+    "README.md",
+    "docs/ACTIONS.md",
+    "docs/ARCHITECTURE.md",
+    "docs/HANDOFF.md",
+    "docs/SAFETY.md",
+    "examples/actions_dry_run.json",
+    "src/gesture_assistant/config/default_config.json",
+    "src/gesture_assistant/config/schema.py",
+    "src/gesture_assistant/core/action_executor.py",
+    "src/gesture_assistant/core/context_detector.py",
+    "src/gesture_assistant/integrations/dispatcher.py",
+    "src/gesture_assistant/integrations/keyboard_actions.py",
+    "src/gesture_assistant/integrations/media_actions.py",
+    "src/gesture_assistant/integrations/native_backend.py",
+    "src/gesture_assistant/integrations/presentation_actions.py",
+    "tests/test_context_detector.py"
+  ],
+  "deleted_files": [],
+  "pure_tests": [
+    [
+      0,
+      "253 passed in 0.58s"
+    ],
+    [
+      0,
+      "253 passed in 0.57s"
+    ],
+    [
+      0,
+      "253 passed in 0.57s"
+    ]
+  ],
+  "full_suite_exit": 2,
+  "lint_exit": 1,
+  "app_exit": 1,
+  "syntax_checked_files": 82,
+  "sha256": {
+    "src/gesture_assistant/integrations/presentation_actions.py": "dfde1809b7dde9a9aa2f06c30d5667695c96aa46ea6af6d898f9f98c745768bb",
+    "src/gesture_assistant/integrations/media_actions.py": "cb6f1a0ad25947363ca9043acaa6d146c827850e46bc9800a974c5f760bb90ed",
+    "src/gesture_assistant/integrations/keyboard_actions.py": "fe128ff0f54f7a4c31ff531d6574b7c77b8894cd05dc0ccb0a4b1bed76baafa5",
+    "src/gesture_assistant/integrations/native_backend.py": "5f562d8e678e2de790fa5042203987f46ff45822248ddf832d28261428e746f2",
+    "src/gesture_assistant/config/schema.py": "23e31540af7c05d56d4ef3b8ccb8ce42e775d913cc565b4cfd35da05072c9b82",
+    "src/gesture_assistant/integrations/dispatcher.py": "3bd02585c6ebb8f94f458897efb88577266fb1a868239e334f0b8db8530aefe8",
+    "src/gesture_assistant/core/context_detector.py": "a4ba8bdc92a2c3cb94f9c62a18540025c77817c6b71dad6857722f12384ca923",
+    "src/gesture_assistant/core/action_executor.py": "f0fbb24758553f7eed8be58792957313a9dc3a9290e1734f159961741b97b8b7",
+    "src/gesture_assistant/config/default_config.json": "2b400a38ba112f47fba2384221afc38061d45927b659e55118ca4ed3c31617a2",
+    "examples/actions_dry_run.json": "7c4d9827ee3eea527cf03975b671f49051e4819dfba7dc8b74d9f2c31721aa67",
+    "tests/integration_samples.py": "2620ab9bd3cb8b0f2232f5d07b9722f86e6f8567a37abca37440787623d664fe",
+    "tests/test_presentation_actions.py": "47343f011f58a3d8ee6a7f640e5b24061afc37d62c044f993af87a38bcb2b9b7",
+    "tests/test_media_actions.py": "bdca5b7758799af483f59e3ea83453639b60db5bbe5f8bbaced899514227afcc",
+    "tests/test_integrations_final.py": "4aac23ad3f0fca5a0ee3f4a29c201a00439bb8e0b6d2f7131daf080bf6c4c468",
+    "tests/test_context_detector.py": "86461b33d3f479cca691e0aa4a02788bbe2cdbe15e284dcc0ff7bbc59d835b8e",
+    "tests/test_context_reader.py": "e498bd58c40b22f3c062c9574b65d78178b62b773ecedded5bf210f7d12e63ba",
+    "tests/test_runtime_lifecycle.py": "61c0313d0af671012d23ebc457fe4a605c5ed422ffff0f7dfc20c766aeb49695",
+    "docs/ACTIONS.md": "8e2b67acfe3eeb3bd0bfcf8468a504dadd3db6ccab67261fa9dd7733e5ce5283",
+    "docs/SAFETY.md": "a17b6906bd70f0168860e5cabe66d149bf6c31234a20d1717ab6d0d8609f423c",
+    "docs/ARCHITECTURE.md": "09fc8f18b54137a20a4c6cf47436179d5e1e204bc03fd5b55488ac4316bf8952",
+    "docs/HANDOFF.md": "4d968fd007da8dcc937bafff9eaa4c0cd015dc14d89a2ab5276be0de876b82fc",
+    "README.md": "c91a921c9ee14966fd939735d68fd2bec43f367dc6193f0159ab1e96f21fecbe",
+    "docs/VERIFICATION_3C.md": "5ade48abe555115eef832376680f0134c6c98409be9f6f3ea7a78dd38c298adc",
+    "docs/STAGE3C_COMMANDS.txt": "e12ff5395ea6bf355dc3687e638c3588950ee956b622d2ba1f890ca3aec5ce94",
+    "docs/STAGE3C_LOG.txt": "fc00913ffb2a23a3c15e1b77d17029b4180749e4bffaa45e15e8f06d72a626bd"
+  }
+}

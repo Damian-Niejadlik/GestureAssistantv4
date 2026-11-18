@@ -1,0 +1,7 @@
+python -m venv --system-site-packages work/venv
+python -m pytest -v
+python -m ruff check .
+python -m pytest -q tests/test_action_executor.py tests/test_analysis_pipeline.py tests/test_config_manager.py tests/test_context_detector.py tests/test_context_reader.py tests/test_debounce.py tests/test_gesture_classifier.py tests/test_hand_provider.py tests/test_hand_provider_runtime.py tests/test_integrations_final.py tests/test_media_actions.py tests/test_motion_classifier.py tests/test_pose_provider.py tests/test_presentation_actions.py tests/test_runtime_lifecycle.py tests/test_safety_manager.py tests/test_smoothing.py tests/test_teams.py tests/test_windows_actions.py
+python -m pytest -v
+python -m ruff check .
+python main.py

@@ -1,0 +1,77 @@
+{
+  "base_export": "2026-11-17 23:52:55",
+  "new_files": [
+    "docs/EXECUTION_FIX.md",
+    "docs/EXECUTION_FIX_LOG.txt",
+    "tests/test_open_url_execution.py"
+  ],
+  "modified_files": [
+    "docs/ACTIONS.md",
+    "docs/ARCHITECTURE.md",
+    "docs/HANDOFF.md",
+    "docs/SAFETY.md",
+    "src/gesture_assistant/core/action_runtime.py",
+    "src/gesture_assistant/core/analysis_pipeline.py",
+    "src/gesture_assistant/core/context_detector.py",
+    "src/gesture_assistant/core/safety_manager.py",
+    "src/gesture_assistant/integrations/browser_actions.py",
+    "src/gesture_assistant/integrations/contracts.py",
+    "src/gesture_assistant/ui/main_window.py",
+    "tests/test_context_reader.py",
+    "tests/test_ui_stage2.py"
+  ],
+  "deleted_files": [],
+  "config_json_modified": false,
+  "regression_before_exit": 1,
+  "pure_results": [
+    [
+      0,
+      "316 passed in 0.83s"
+    ],
+    [
+      0,
+      "316 passed in 0.80s"
+    ],
+    [
+      0,
+      "316 passed in 0.79s"
+    ]
+  ],
+  "full_suite_exit": 2,
+  "lint_exit": 1,
+  "gui_start_exit": 1,
+  "actual_config_with_mock_exit": 0,
+  "sha256": {
+    "src/gesture_assistant/integrations/contracts.py": "5d96a4e29e46a8bedef43ed6ea94725a0ad3a5fb34831e1e5de21fe77cc081a2",
+    "src/gesture_assistant/integrations/browser_actions.py": "64b9af2baab0d21cab57488b21671a807b61320cf4f567853948f97caf83c3c8",
+    "src/gesture_assistant/core/context_detector.py": "a08be157dea314e0b39cdb6e0f8d55e20a75589f2cae0b70114ded7529460faa",
+    "src/gesture_assistant/core/safety_manager.py": "7e50637a4bcf1b4f63521a696a267f797d98b7e15449287a3061a7bf6c66b612",
+    "src/gesture_assistant/core/analysis_pipeline.py": "f4ab7a2bc0f819f5a3252ab659314d62a93cccac8686f1f61601f7299d925084",
+    "src/gesture_assistant/core/action_runtime.py": "03dc62e87973517fe23241c7a4687cb5ede40bc2005d47f12c095703fe2d9db3",
+    "src/gesture_assistant/ui/main_window.py": "32312d0fa4c249c611e755807afe4e64cdc56cc65e9fd1ea60d19b402ad9ff9e",
+    "tests/test_open_url_execution.py": "6e64df91e5fc47c049286495634fca563b1b1ef7431c81310b42610e6a32bf42",
+    "tests/test_ui_stage2.py": "1f5c7179fcd318c1afffccf437bf88953758b09b23f9d93e0bfac6fc773dae20",
+    "tests/test_context_reader.py": "6230cdf91d7182c2bb217db2c6dfeeb99da8522a17e63eba8a9f56d650a5663c",
+    "docs/ACTIONS.md": "68c8d7fae6a5fe3adfeec9b96a6fa73b4b03ed5937b288f22f263c4deb8faa18",
+    "docs/SAFETY.md": "04dc199cb62aadd925ccb66f64d14536a8db862a9cad396c291cb983f9f424c0",
+    "docs/ARCHITECTURE.md": "f21a089a5c5356fa2f433f5861c3355cb0c7c0dacbf04e7c3cbc8961d06ad4d3",
+    "docs/HANDOFF.md": "c53a2205eec9a748a09c58275752887b6d8740a23ecb56ba1e11f174f99c1b56",
+    "docs/EXECUTION_FIX.md": "8136ffdfd4b3321135a0ff26b9cbab9bf402050f1612da607154b69c89fc2975",
+    "docs/EXECUTION_FIX_LOG.txt": "2b49b3a1d9ff5a5dee3c9c2c1270c8f5a01daae82ab2da40ac87333fc66df291"
+  },
+  "base_sha256": {
+    "src/gesture_assistant/integrations/contracts.py": "9dcdfc823c07384a25767e3d1b15cf2708bc969a16e32e3806947cdf51984502",
+    "src/gesture_assistant/integrations/browser_actions.py": "cc0dc6948d512b6383826bee62012b80d3380932f7616802864dd667672c8fb7",
+    "src/gesture_assistant/core/context_detector.py": "a4ba8bdc92a2c3cb94f9c62a18540025c77817c6b71dad6857722f12384ca923",
+    "src/gesture_assistant/core/safety_manager.py": "93c5f9b4107ca92479c1b4ab27bb471f868c14bf64204dc99dee772fd915dbfe",
+    "src/gesture_assistant/core/analysis_pipeline.py": "2c5582670f70e225d179dfa0860112d942e1f21923fcf3bcea121c2cfdbe0847",
+    "src/gesture_assistant/core/action_runtime.py": "0814edf620941f2d30360790854fba8daa9a414bcbe24abe56d674b8c2ed8d9a",
+    "src/gesture_assistant/ui/main_window.py": "64b8dde5171628905fd8f17e6b2aff65f4b609d3bd4cf4a9ae868ff8a10850d9",
+    "tests/test_ui_stage2.py": "db1f660861d6d774851bf1e88dd207bac348974c25540fe9385a9e69aa530300",
+    "tests/test_context_reader.py": "bea76e647e0d9332464c69a360d16205fdd7e4d8d167c90e6495a36cec7439b1",
+    "docs/ACTIONS.md": "8e2b67acfe3eeb3bd0bfcf8468a504dadd3db6ccab67261fa9dd7733e5ce5283",
+    "docs/SAFETY.md": "a17b6906bd70f0168860e5cabe66d149bf6c31234a20d1717ab6d0d8609f423c",
+    "docs/ARCHITECTURE.md": "09fc8f18b54137a20a4c6cf47436179d5e1e204bc03fd5b55488ac4316bf8952",
+    "docs/HANDOFF.md": "4d968fd007da8dcc937bafff9eaa4c0cd015dc14d89a2ab5276be0de876b82fc"
+  }
+}

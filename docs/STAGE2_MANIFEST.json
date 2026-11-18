@@ -1,0 +1,92 @@
+{
+  "base": "GestureAssistant_kod.txt export 2026-11-12 14:16:12",
+  "python": "3.12.8",
+  "syntax_checked_files": 51,
+  "new_files": [
+    "docs/AUDIT_STAGE2.md",
+    "docs/GESTURE_LIMITATIONS.md",
+    "docs/STAGE2_TEST_LOG.txt",
+    "src/gesture_assistant/core/__init__.py",
+    "src/gesture_assistant/core/analysis_pipeline.py",
+    "src/gesture_assistant/core/debounce.py",
+    "src/gesture_assistant/core/gesture_engine.py",
+    "src/gesture_assistant/core/motion_engine.py",
+    "src/gesture_assistant/gestures/__init__.py",
+    "src/gesture_assistant/gestures/classifier.py",
+    "src/gesture_assistant/gestures/definitions.py",
+    "src/gesture_assistant/gestures/motion_classifier.py",
+    "src/gesture_assistant/gestures/quality.py",
+    "src/gesture_assistant/gestures/smoothing.py",
+    "tests/gesture_samples.py",
+    "tests/test_analysis_pipeline.py",
+    "tests/test_debounce.py",
+    "tests/test_gesture_classifier.py",
+    "tests/test_hand_provider_runtime.py",
+    "tests/test_motion_classifier.py",
+    "tests/test_smoothing.py",
+    "tests/test_ui_stage2.py"
+  ],
+  "modified_files": [
+    "README.md",
+    "docs/ARCHITECTURE.md",
+    "docs/HANDOFF.md",
+    "docs/VERIFICATION.md",
+    "src/gesture_assistant/__init__.py",
+    "src/gesture_assistant/ui/camera_view.py",
+    "src/gesture_assistant/ui/main_window.py",
+    "src/gesture_assistant/vision/camera_worker.py",
+    "tests/conftest.py",
+    "tests/test_camera_worker.py"
+  ],
+  "deleted_files": [],
+  "pure_tests": [
+    [
+      0,
+      "82 passed in 0.17s"
+    ],
+    [
+      0,
+      "82 passed in 0.17s"
+    ],
+    [
+      0,
+      "82 passed in 0.17s"
+    ]
+  ],
+  "full_suite_exit": 2,
+  "ruff_exit": 1,
+  "sha256": {
+    "src/gesture_assistant/gestures/__init__.py": "4869a77eb3df17a0fb370eef86b8ea4585225ef49f9fc0ba0ce277244ec2d88a",
+    "src/gesture_assistant/core/__init__.py": "91d6b0129641b8d07af747b49bb70daeac698048e1583a7cf8517e252230b2e4",
+    "src/gesture_assistant/gestures/definitions.py": "af06fbdd46fe6659c38f30a71e8acdac665d2c61407d0445e3887d5f1fa5515e",
+    "src/gesture_assistant/gestures/quality.py": "65ef7d469255548ff761fdcdc1f51789dc42a9746fa6dfe1e94dc9655636786c",
+    "src/gesture_assistant/gestures/classifier.py": "ef31c93a8df2ad028bb1a555c616010f2256ba268bd2feaa5c8a583f6335d30f",
+    "src/gesture_assistant/gestures/smoothing.py": "e393dce9ce0842f26b4108caac5ef9dd1943237d1730d871651aa0754ab75929",
+    "src/gesture_assistant/core/debounce.py": "a4770775f119797fed0fec3d8c6c3df9cf38bb485284686a8e7e84f0f9df3312",
+    "src/gesture_assistant/gestures/motion_classifier.py": "71220a99c95cc8a8713154a405aedf0ec4065b1dc9cad4eb9f621835dbbaf9b7",
+    "src/gesture_assistant/core/gesture_engine.py": "b48e3df69e0d47cbe4ad21c7d5a436053752c5d16136e4a66d02fe2803c02d2c",
+    "src/gesture_assistant/core/motion_engine.py": "4b99015ac081d58fbdcf7fe63bb476aa50cc0c88c55231e6aa1f80dc64bb5b60",
+    "src/gesture_assistant/core/analysis_pipeline.py": "6051605d49a56495a27aebd20b27915074bad9d0ec644733997278902ad60568",
+    "tests/gesture_samples.py": "2a6c8b17e1e12cf331372a8c99157273814420ee317017afb54d09c897a31bb2",
+    "tests/test_gesture_classifier.py": "6ea357729c987439e22dc2cf487837ae42f34af17a5cd2319db79be9305c1b82",
+    "tests/test_motion_classifier.py": "d61fc26b77f0954ec3f42e0319f80955cb912ea93b84b85fe9e491458ae5136a",
+    "tests/test_debounce.py": "d86fafefce1f9200ea9b7741febb4517092c1789013659f7f414303353a3125c",
+    "tests/test_smoothing.py": "f685849d554d46b7b7e90e78222d46251832ab411084bbaf183af4de3a902d39",
+    "tests/test_analysis_pipeline.py": "58b5ecc9e06478cd4a6be35757b203eb8ab1d2c5a70e7dfdb486fbeedf2b90f1",
+    "tests/conftest.py": "fbfb368fcfbc5db63d15a59862b8c07f37715fc11b7bf58b480da7d92bdc0c2a",
+    "src/gesture_assistant/vision/camera_worker.py": "6d8519acacaaf078a180894c8acaf94619a24c1f52608fa55683450a08524c5e",
+    "src/gesture_assistant/ui/main_window.py": "2da93de0bee9cb6e6dda76584342f16cbeb538d820ca23c25114b08eb074f983",
+    "tests/test_camera_worker.py": "1b950850ed05e2c41b24a00c38f5feb9a98ce725b70e9e6580830653ebf57e00",
+    "tests/test_hand_provider_runtime.py": "4cec5c2181aa359a9652e7bb1b1d071b363d4c27058a319c0431cf6f26cc657a",
+    "src/gesture_assistant/ui/camera_view.py": "676913cbece143a523e3fc9278861e0b47117e1cbaf299ab91ffc817db63d2c2",
+    "src/gesture_assistant/__init__.py": "67cf7cc9626e7ec045752425bfd720d5ad81aca1a9be0da31f5b9a545d3c5faa",
+    "docs/AUDIT_STAGE2.md": "59ee5036f1dea39b1c512c6a8381f7392c1e3022fc2aeadc77d9723d31e15997",
+    "docs/GESTURE_LIMITATIONS.md": "aef1c8457b13ac8d49b1ad5c93d3db5b0f8a93af0d5f3c8176beae288ac519f3",
+    "docs/ARCHITECTURE.md": "7e1846aee24d23c56fcbaf8e545233c8082f941e5ed5df6d2e6a530078324bef",
+    "docs/HANDOFF.md": "ced16df053edba96ead1c16a95223f64bd34c10a70a0f8e0855557cd40420afc",
+    "README.md": "6e37c9ed3a4f934f479e756b8f12fe5107575a567332aae27a410b1734a899c3",
+    "tests/test_ui_stage2.py": "1fce6b35d208cefb9d9828d09cf0c3b0f7e47157b6ec89813f3c869cd673fabc",
+    "docs/VERIFICATION.md": "e86a1f3ab5bdc8313f93f4d45d4c16c75bea360a6404621bf2ef82058e1dfdd5",
+    "docs/STAGE2_TEST_LOG.txt": "7883645683af7ab1c9c128d41f603684f8e39106fa734c9969bea564f77ea50b"
+  }
+}
